@@ -43,6 +43,25 @@ const Dashboard = () => {
         <p>Monitor your alert statuses and manage security contacts.</p>
       </div>
 
+      {/* Safety Status Banner */}
+      <div style={{
+        padding: "16px 20px",
+        marginBottom: "24px",
+        borderRadius: "8px",
+        backgroundColor: activeSOS ? "rgba(255, 0, 0, 0.1)" : "rgba(0, 200, 0, 0.1)",
+        border: `2px solid ${activeSOS ? "var(--primary-red)" : "#00c800"}`,
+        textAlign: "center",
+      }}>
+        <p style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: activeSOS ? "var(--primary-red)" : "#00c800" }}>
+          {activeSOS ? "🚨 EMERGENCY ALERT ACTIVE" : "✅ SAFE STATUS"}
+        </p>
+        {!activeSOS && (
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "6px 0 0 0" }}>
+            No active emergency alerts. System is monitoring.
+          </p>
+        )}
+      </div>
+
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
 
       {loading ? (
@@ -59,7 +78,7 @@ const Dashboard = () => {
                   An emergency alert was triggered on {new Date(activeSOS.triggeredAt || activeSOS.createdAt).toLocaleString()}.
                 </p>
                 <Link to="/sos" className="btn btn-primary btn-sm">
-                  View SOS Details
+                  View SOS Details & Resolve
                 </Link>
               </div>
             ) : (
