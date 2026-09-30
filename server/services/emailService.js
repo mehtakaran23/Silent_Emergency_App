@@ -8,6 +8,59 @@ const jwt = require("jsonwebtoken");
 const RESPONSE_TOKEN_TTL = process.env.CONTACT_RESPONSE_TOKEN_TTL || "7d";
 const responseSecret = () => process.env.CONTACT_RESPONSE_SECRET || process.env.JWT_SECRET;
 
+const getSMTPConfiguration = () => {
+  const host = String(process.env.SMTP_HOST || "").trim();
+  const portValue = String(process.env.SMTP_PORT || "587").trim();
+  const port = Number(portValue);
+  const secureValue = String(process.env.SMTP_SECURE || "false").trim().toLowerCase();
+  const user = String(process.env.SMTP_USER || "").trim();
+  const pass = String(process.env.SMTP_PASS || "");
+  const from = String(process.env.EMAIL_FROM || "").trim();
+  const missing = [];
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!host) missing.push("SMTP_HOST");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) missing.push("SMTP_PORT");
+  if (!["true", "false"].includes(secureValue)) missing.push("SMTP_SECURE");
+  if (!user) missing.push("SMTP_USER");
+  if (!pass) missing.push("SMTP_PASS");
+  if (!from) missing.push("EMAIL_FROM");
+  if (from && !emailPattern.test(from)) missing.push("EMAIL_FROM_FORMAT");
+  if (user && from && from.toLowerCase() !== user.toLowerCase()) {
+    missing.push("EMAIL_FROM_MUST_MATCH_SMTP_USER");
+  }
+
+  return {
+    configured: missing.length === 0,
+    missing,
+    host,
+    port,
+    secure: secureValue === "true",
+    user,
+    pass,
+    from,
+  };
+};
+
+const getSafeSMTPError = (error) => {
+  const details = [
+    error?.message,
+    error?.code ? `code=${error.code}` : null,
+    error?.responseCode ? `responseCode=${error.responseCode}` : null,
+    error?.command ? `command=${error.command}` : null,
+    error?.response ? `response=${String(error.response).replace(/\s+/g, " ").slice(0, 500)}` : null,
+  ].filter(Boolean);
+  return details.join("; ") || "SMTP provider returned an unknown error.";
+};
+
+const getSafeMailOptions = (mailOptions) => ({
+  from: mailOptions.from,
+  to: mailOptions.to,
+  subject: mailOptions.subject,
+  hasText: Boolean(mailOptions.text),
+  hasHtml: Boolean(mailOptions.html),
+});
+
 const createContactResponseToken = (alert, contact) => {
   const jti = crypto.randomBytes(24).toString("hex");
   const secret = responseSecret();
@@ -19,16 +72,18 @@ const createContactResponseToken = (alert, contact) => {
     {
       alertId: alert._id.toString(),
       contactId: contact._id.toString(),
+      userId: alert.userId.toString(),
       jti,
     },
     secret,
     { expiresIn: RESPONSE_TOKEN_TTL }
   );
 
+  const decoded = jwt.decode(token);
   return {
     token,
     tokenHash: crypto.createHash("sha256").update(jti).digest("hex"),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expiresAt: new Date((decoded?.exp || Math.floor(Date.now() / 1000)) * 1000),
   };
 };
 
@@ -44,15 +99,28 @@ const escapeHtml = (value) =>
  * Creates a Nodemailer transporter based on SMTP configuration in .env.
  */
 const createTransporter = () => {
+  const config = getSMTPConfiguration();
+  if (!config.configured) {
+    throw new Error(`SMTP configuration is incomplete. Missing: ${config.missing.join(", ")}`);
+  }
+
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    secure: process.env.SMTP_SECURE === "true",
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: config.user,
+      pass: config.pass,
     },
   });
+};
+
+const getSMTPStatusMessage = () => {
+  const config = getSMTPConfiguration();
+  if (config.configured) {
+    return `SMTP configuration detected (${config.host}:${config.port}, secure=${config.secure}).`;
+  }
+  return `SMTP not configured; emergency emails will be recorded as FAILED. Missing: ${config.missing.join(", ")}.`;
 };
 
 /**
@@ -83,15 +151,20 @@ const sendSOSNotificationEmails = async (alert) => {
     }
 
     // 3. Check for SMTP config
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-
-    const isSmtpConfigured = !!(smtpHost && smtpUser && smtpPass);
+    const smtpConfig = getSMTPConfiguration();
+    const isSmtpConfigured = smtpConfig.configured;
 
     let transporter = null;
     if (isSmtpConfigured) {
       transporter = createTransporter();
+      try {
+        await transporter.verify();
+        console.log("SMTP transporter.verify() succeeded.");
+      } catch (verifyError) {
+        const verifyMessage = getSafeSMTPError(verifyError);
+        console.error(`SMTP transporter.verify() failed: ${verifyMessage}`);
+        transporter = null;
+      }
     }
 
     // 4. Iterate over contacts and send emails
@@ -123,13 +196,14 @@ const sendSOSNotificationEmails = async (alert) => {
         console.error("Could not create contact response token:", tokenError);
       }
 
-      const responseUrl = responseToken
-        ? `${process.env.CLIENT_URL || "http://localhost:5173"}/respond/${responseToken.token}`
+      const clientBaseUrl = process.env.CLIENT_URL || process.env.SOCKET_CORS_ORIGIN;
+      const responseUrl = responseToken && clientBaseUrl
+        ? `${clientBaseUrl.replace(/\/$/, "")}/respond/${responseToken.token}`
         : null;
       const safeUserName = escapeHtml(user.name);
       const safeStatus = escapeHtml(alert.status);
       const mailOptions = {
-        from: process.env.EMAIL_FROM || smtpUser || "no-reply@silent-sos.com",
+        from: smtpConfig.from,
         to: contact.email,
         subject: `EMERGENCY ALERT: ${user.name} needs help`,
         text: `EMERGENCY ALERT\n\n` +
@@ -184,19 +258,37 @@ const sendSOSNotificationEmails = async (alert) => {
 
       let status = "SUCCESS";
       let errorMsg = null;
+      console.log("Prepared emergency email:", getSafeMailOptions(mailOptions));
 
       if (!isSmtpConfigured) {
         status = "FAILED";
-        errorMsg = "SMTP parameters are not configured in environment variables (.env).";
-        console.error(`SMTP config missing. Could not send email to ${contact.email}.`);
+        errorMsg = `SMTP not configured. Missing: ${smtpConfig.missing.join(", ")}.`;
+        console.error(`EMAIL NOT SENT — SMTP NOT CONFIGURED (recipient: ${contact.email}; missing: ${smtpConfig.missing.join(", ")})`);
+      } else if (!transporter) {
+        status = "FAILED";
+        errorMsg = "SMTP transporter verification failed; see server logs for the sanitized provider error.";
       } else {
         try {
-          await transporter.sendMail(mailOptions);
-          console.log(`Emergency email successfully sent to ${contact.email} for user ${user.name}.`);
+          const result = await transporter.sendMail(mailOptions);
+          console.log("SMTP sendMail result:", {
+            accepted: result.accepted,
+            rejected: result.rejected,
+            response: result.response,
+            messageId: result.messageId,
+          });
+          const accepted = Array.isArray(result.accepted) && result.accepted
+            .some((recipient) => String(recipient).toLowerCase() === contact.email.toLowerCase());
+          if (!accepted) {
+            status = "FAILED";
+            errorMsg = "SMTP accepted no recipient for delivery.";
+            console.error(`EMAIL NOT SENT — SMTP accepted no recipient (recipient: ${contact.email})`);
+          } else {
+            console.log(`Emergency email accepted by SMTP for ${contact.email} (messageId: ${result.messageId || "unknown"}).`);
+          }
         } catch (emailError) {
           status = "FAILED";
-          errorMsg = emailError.message || String(emailError);
-          console.error(`Failed to send emergency email to ${contact.email}:`, emailError);
+          errorMsg = getSafeSMTPError(emailError);
+          console.error(`EMAIL NOT SENT — SMTP delivery failed (recipient: ${contact.email}; ${errorMsg})`);
         }
       }
 
@@ -225,4 +317,7 @@ const sendSOSNotificationEmails = async (alert) => {
 module.exports = {
   sendSOSNotificationEmails,
   createContactResponseToken,
+  getSMTPConfiguration,
+  getSMTPStatusMessage,
+  getSafeSMTPError,
 };

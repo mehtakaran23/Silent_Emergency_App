@@ -47,7 +47,7 @@ const buildContactPayload = (body) => {
 };
 
 const validateContactPayload = (payload, requireAllFields = false) => {
-  const requiredFields = ["name", "relation", "phone", "email", "priority"];
+  const requiredFields = ["name", "relation", "priority"];
 
   if (requireAllFields) {
     const missingFields = requiredFields.filter(
@@ -65,6 +65,10 @@ const validateContactPayload = (payload, requireAllFields = false) => {
 
   if (payload.relation !== undefined && !payload.relation) {
     return "Relation is required.";
+  }
+
+  if (requireAllFields && !payload.phone && !payload.email) {
+    return "Provide at least an email address or phone number.";
   }
 
   if (payload.phone !== undefined && !isValidPhone(payload.phone)) {
@@ -266,6 +270,13 @@ const updateContact = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: validationError,
+      });
+    }
+
+    if (!payload.phone && !payload.email && !contact.phone && !contact.email) {
+      return res.status(400).json({
+        success: false,
+        message: "A contact must have an email address or phone number.",
       });
     }
 

@@ -4,6 +4,15 @@ const Alert = require("../models/Alert");
 
 let ioInstance = null;
 
+const getAllowedOrigins = () => {
+  const origins = [
+    process.env.CLIENT_URL,
+    process.env.SOCKET_CORS_ORIGIN,
+  ].filter(Boolean);
+
+  return [...new Set(origins)];
+};
+
 const getTokenFromSocket = (socket) => {
   const authToken = socket.handshake.auth?.token;
   const bearerToken = socket.handshake.headers?.authorization;
@@ -64,7 +73,15 @@ const initializeSocket = (server) => {
 
   ioInstance = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || "http://localhost:5173",
+      origin: (origin, callback) => {
+        const allowedOrigins = getAllowedOrigins();
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(null, false);
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },

@@ -20,12 +20,12 @@ const contactSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     email: {
       type: String,
-      required: true,
+      required: false,
       lowercase: true,
       trim: true,
     },
@@ -45,7 +45,7 @@ const contactSchema = new mongoose.Schema(
   }
 );
 
-contactSchema.index({ user: 1, email: 1 }, { unique: true });
-contactSchema.index({ user: 1, phone: 1 }, { unique: true });
+contactSchema.index({ user: 1, email: 1 }, { unique: true, sparse: true });
+contactSchema.index({ user: 1, phone: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Contact", contactSchema);

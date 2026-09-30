@@ -54,7 +54,7 @@ const getMyProfile = async (req, res) => {
 const updateMyProfile = async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { name, phone } = req.body;
+    const { name, email, phone } = req.body;
 
     if (!userId) {
       return res.status(401).json({
@@ -96,6 +96,30 @@ const updateMyProfile = async (req, res) => {
       }
 
       updates.phone = trimmedPhone;
+    }
+
+    if (email !== undefined) {
+      const trimmedEmail = String(email).trim().toLowerCase();
+      if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Enter a valid email address.",
+        });
+      }
+      updates.email = trimmedEmail || undefined;
+    }
+
+    const currentUser = await User.findById(userId).select("email phone");
+    if (!currentUser) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    const resultingEmail = email === undefined ? currentUser.email : updates.email;
+    const resultingPhone = phone === undefined ? currentUser.phone : updates.phone;
+    if (!resultingEmail && !resultingPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "An email address or phone number must be provided.",
+      });
     }
 
     if (Object.keys(updates).length === 0) {

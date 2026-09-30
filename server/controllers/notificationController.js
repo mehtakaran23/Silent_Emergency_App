@@ -22,4 +22,21 @@ const getMyNotificationLogs = async (req, res) => {
   }
 };
 
-module.exports = { getMyNotificationLogs };
+const getAlertNotificationLogs = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { alertId } = req.params;
+    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized access." });
+    const alert = await Alert.findOne({ _id: alertId, userId }).select("_id");
+    if (!alert) return res.status(404).json({ success: false, message: "Alert not found." });
+    const notifications = await NotificationLog.find({ alertId })
+      .sort({ sentAt: -1 })
+      .populate("contactId", "name relation")
+      .select("-responseTokenHash");
+    return res.status(200).json({ success: true, count: notifications.length, notifications });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Unable to fetch alert notification logs." });
+  }
+};
+
+module.exports = { getMyNotificationLogs, getAlertNotificationLogs };

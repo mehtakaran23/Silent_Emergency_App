@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Alert = require("../models/Alert");
 const Contact = require("../models/Contact");
 const NotificationLog = require("../models/NotificationLog");
+const User = require("../models/User");
 const { emitToAlertRoom } = require("../sockets/socketManager");
 const { sendSOSNotificationEmails } = require("../services/emailService");
 const crypto = require("crypto");
@@ -287,9 +288,10 @@ const findResponseContext = async (token) => {
     throw tokenError;
   }
 
-  const [alert, contact] = await Promise.all([
+  const [alert, contact, user] = await Promise.all([
     Alert.findById(decoded.alertId),
     Contact.findById(decoded.contactId).select("name relation"),
+    User.findById(decoded.userId).select("name"),
   ]);
 
   if (!alert || !contact) {
@@ -319,6 +321,7 @@ const getContactResponse = async (req, res) => {
         currentLocation: alert.currentLocation,
       },
       contact: { _id: contact._id, name: contact.name, relation: contact.relation },
+      user: { name: user?.name || "Silent SOS user" },
       acknowledged: Boolean(acknowledgement),
       acknowledgedAt: acknowledgement?.acknowledgedAt || log.acknowledgedAt || null,
     });
