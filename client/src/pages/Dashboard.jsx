@@ -110,10 +110,10 @@ const Dashboard = () => {
                 </div>
                 <div style={{ padding: "16px", backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px" }}>
                   <div style={{ fontSize: "24px", fontWeight: "bold", color: "var(--accent-blue)" }}>
-                    Active
+                    {activeSOS ? "Active" : "Ready"}
                   </div>
                   <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                    Mail Service Status
+                    Alert Status
                   </div>
                 </div>
               </div>

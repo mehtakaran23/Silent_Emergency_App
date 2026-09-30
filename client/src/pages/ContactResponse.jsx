@@ -22,6 +22,8 @@ const ContactResponse = () => {
       }
     };
     loadResponse();
+    const refreshTimer = window.setInterval(loadResponse, 10000);
+    return () => window.clearInterval(refreshTimer);
   }, [token]);
 
   const acknowledge = async () => {
@@ -54,8 +56,8 @@ const ContactResponse = () => {
         {response && (
           <>
             <p>
-              <strong>{response.contact?.name || "Emergency contact"}</strong>, an SOS alert was
-              triggered at {new Date(response.alert?.triggeredAt).toLocaleString()}.
+              <strong>{response.user?.name || "A Silent SOS user"}</strong> triggered an SOS alert
+              at {new Date(response.alert?.triggeredAt).toLocaleString()}.
             </p>
             <p style={{ marginTop: "12px" }}>
               Current status: <strong>{response.alert?.status}</strong>

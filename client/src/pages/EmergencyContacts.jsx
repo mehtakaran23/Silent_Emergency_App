@@ -73,8 +73,8 @@ const EmergencyContacts = () => {
     setError("");
     setSuccess("");
 
-    if (!name || !relation || !phone || !email) {
-      setError("All fields except Priority (which defaults) are required.");
+    if (!name || !relation || (!phone && !email)) {
+      setError("Name, relationship, and an email or phone number are required.");
       return;
     }
 
@@ -174,8 +174,8 @@ const EmergencyContacts = () => {
               </div>
               
               <div style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                <div>📞 {contact.phone}</div>
-                <div style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>✉️ {contact.email}</div>
+                {contact.phone && <div>📞 {contact.phone}</div>}
+                {contact.email && <div style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>✉️ {contact.email}</div>}
                 <div>⭐ Priority: {contact.priority}</div>
               </div>
 
@@ -238,7 +238,6 @@ const EmergencyContacts = () => {
                   placeholder="e.g. +1234567890"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  required
                 />
               </div>
 
@@ -250,7 +249,6 @@ const EmergencyContacts = () => {
                   placeholder="e.g. jane@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
                 />
               </div>
 

@@ -31,6 +31,7 @@ const SOS = () => {
   const [lastLocationUpdate, setLastLocationUpdate] = useState(null);
   const [isResolvingLoading, setIsResolvingLoading] = useState(false);
   const [acknowledgements, setAcknowledgements] = useState([]);
+  const [notificationLogs, setNotificationLogs] = useState([]);
   
   const PRESS_DURATION = 3000; // 3 seconds in milliseconds
   const PROGRESS_UPDATE_INTERVAL = 50; // Update progress every 50ms
@@ -183,7 +184,7 @@ const SOS = () => {
       if (res.data?.success && res.data?.alert) {
         setActiveSOS(res.data.alert);
         setLastLocationUpdate(null);
-        setSuccess("SOS activated successfully! Emergency contacts have been notified.");
+        setSuccess("SOS activated successfully. Notification delivery attempts have started.");
         setPressProgress(0);
       } else {
         setError(res.data?.message || "Failed to activate SOS.");
@@ -231,6 +232,32 @@ const SOS = () => {
       setIsResolvingLoading(false);
     }
   };
+
+  const cancelSOS = async () => {
+    if (!activeSOS?._id || !window.confirm("Cancel this SOS alert?")) return;
+    try {
+      setIsResolvingLoading(true);
+      const res = await API.post(`/sos/${activeSOS._id}/cancel`);
+      if (res.data?.success) {
+        setActiveSOS(null);
+        setLastLocationUpdate(null);
+        setAcknowledgements([]);
+        setNotificationLogs([]);
+        setSuccess("SOS alert cancelled. Tracking stopped.");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to cancel SOS.");
+    } finally {
+      setIsResolvingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeSOS?._id) return;
+    API.get(`/notifications/alert/${activeSOS._id}`)
+      .then((res) => setNotificationLogs(res.data?.notifications || []))
+      .catch(() => setNotificationLogs([]));
+  }, [activeSOS?._id]);
 
   // Socket.IO integration for real-time updates
   useEffect(() => {
@@ -369,6 +396,11 @@ const SOS = () => {
                 ✅ {acknowledgements.length} contact{acknowledgements.length === 1 ? "" : "s"} acknowledged this alert.
               </p>
             )}
+            {notificationLogs.length > 0 && (
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
+                Notifications: {notificationLogs.map((item) => `${item.recipient} (${item.status})`).join(", ")}
+              </p>
+            )}
 
             {/* Resolve Button */}
             <button
@@ -389,6 +421,14 @@ const SOS = () => {
               }}
             >
               {isResolvingLoading ? "Resolving..." : "🛑 Resolve SOS Alert"}
+            </button>
+            <button
+              onClick={cancelSOS}
+              disabled={isResolvingLoading}
+              className="btn btn-secondary"
+              style={{ width: "100%", marginTop: "10px" }}
+            >
+              Cancel SOS
             </button>
           </div>
         ) : (

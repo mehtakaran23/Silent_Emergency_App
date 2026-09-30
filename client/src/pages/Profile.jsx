@@ -3,7 +3,7 @@ import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 const Profile = () => {
-  const { user, refreshProfile } = useAuth();
+  const { refreshProfile } = useAuth();
   
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,14 +40,14 @@ const Profile = () => {
     setError("");
     setSuccess("");
 
-    if (!name || !phone) {
-      setError("Name and Phone fields are required.");
+    if (!name || (!email && !phone)) {
+      setError("Name and an email or phone number are required.");
       return;
     }
 
     try {
       setLoading(true);
-      const res = await API.put("/profile/me", { name, phone });
+      const res = await API.put("/profile/me", { name, email, phone });
       if (res.data?.success) {
         setSuccess("Profile updated successfully!");
         // Update user state in AuthContext
@@ -91,13 +91,13 @@ const Profile = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Email Address (Read-only)</label>
+              <label className="form-label">Email Address</label>
               <input
                 type="email"
                 className="form-control"
                 value={email}
-                disabled
-                style={{ opacity: 0.6, cursor: "not-allowed" }}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -108,7 +108,6 @@ const Profile = () => {
                 className="form-control"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                required
                 disabled={loading}
               />
             </div>

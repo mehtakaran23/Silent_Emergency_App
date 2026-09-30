@@ -109,7 +109,6 @@ const Register = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              required
               disabled={loading}
             />
           </div>
@@ -122,7 +121,6 @@ const Register = () => {
               placeholder="Repeat password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required
               required
               disabled={loading}
             />

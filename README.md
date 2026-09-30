@@ -14,6 +14,10 @@ link (`/respond/:token`) that lets the recipient acknowledge the alert without
 creating an account. Acknowledgements and live GPS updates are broadcast to the
 authenticated alert owner over Socket.IO.
 
+For Gmail, use a Google App Password rather than the normal account password.
+When SMTP is not configured, email attempts are recorded as `FAILED`; the
+application never reports undelivered email as successful.
+
 ## API areas
 
 - `/api/auth` — registration, login, and the authenticated current-user endpoint
