@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import API from "../services/api";
+import { disconnectSocket } from "../services/socket";
 
 const AuthContext = createContext(null);
 
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }) => {
           const response = await API.get("/profile/me");
           if (response.data?.success && response.data?.profile) {
             setUser(response.data.profile);
+            localStorage.setItem("sos_user", JSON.stringify(response.data.profile));
             setToken(savedToken);
             setIsAuthenticated(true);
           } else {
@@ -39,20 +41,23 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const handleSessionClear = () => {
+    disconnectSocket();
     localStorage.removeItem("sos_token");
+    localStorage.removeItem("sos_user");
     setUser(null);
     setToken(null);
     setIsAuthenticated(false);
   };
 
   // Login handler
-  const login = async (email, password) => {
+  const login = async (identifier, password) => {
     setLoading(true);
     try {
-      const response = await API.post("/auth/login", { email, password });
+      const response = await API.post("/auth/login", { identifier, password });
       if (response.data?.success && response.data?.token) {
         const receivedToken = response.data.token;
         localStorage.setItem("sos_token", receivedToken);
+        localStorage.setItem("sos_user", JSON.stringify(response.data.user || {}));
         setToken(receivedToken);
         
         // Fetch full profile details
@@ -86,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
       if (response.data?.success) {
         // Register successful, auto-login using credentials
-        return await login(email, password);
+        return await login(email || phone, password);
       }
       return { success: false, message: response.data?.message || "Registration failed." };
     } catch (error) {

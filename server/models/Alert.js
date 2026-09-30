@@ -1,5 +1,26 @@
 const mongoose = require("mongoose");
 
+const contactAcknowledgementSchema = new mongoose.Schema(
+  {
+    contactId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contact",
+      required: true,
+    },
+    contactName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    acknowledgedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 const alertSchema = new mongoose.Schema(
   {
     userId: {
@@ -24,6 +45,11 @@ const alertSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    acknowledgedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contact",
+      default: null,
+    },
     resolvedAt: {
       type: Date,
       default: null,
@@ -31,6 +57,10 @@ const alertSchema = new mongoose.Schema(
     responseTime: {
       type: Number,
       default: null,
+    },
+    contactAcknowledgements: {
+      type: [contactAcknowledgementSchema],
+      default: [],
     },
     currentLocation: {
       latitude: {

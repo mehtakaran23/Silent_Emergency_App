@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import EmergencyContacts from "./pages/EmergencyContacts";
 import SOS from "./pages/SOS";
 import AlertHistory from "./pages/AlertHistory";
+import ContactResponse from "./pages/ContactResponse";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/respond/:token" element={<ContactResponse />} />
 
             {/* Protected Routes */}
             <Route

@@ -10,10 +10,12 @@ const userSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
       lowercase: true,
       trim: true,
+      sparse: true,
+      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     },
 
     password: {
@@ -24,7 +26,9 @@ const userSchema = new mongoose.Schema(
 
     phone: {
       type: String,
-      required: true,
+      required: false,
+      trim: true,
+      match: /^[0-9+()\-\s]{7,20}$/,
     },
   },
   {

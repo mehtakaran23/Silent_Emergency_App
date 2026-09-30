@@ -3,7 +3,7 @@ const Alert = require("../models/Alert");
 const LocationHistory = require("../models/LocationHistory");
 const { emitToAlertRoom } = require("../sockets/socketManager");
 
-const ACTIVE_STATUSES = ["ACTIVE", "ACKNOWLEDGED"];
+const ACTIVE_STATUSES = ["TRIGGERED", "ACTIVE", "ACKNOWLEDGED"];
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -15,6 +15,9 @@ const isValidAccuracy = (value) =>
   value === undefined || (typeof value === "number" && Number.isFinite(value) && value >= 0);
 
 const parseTimestamp = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return new Date();
+  }
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
@@ -73,10 +76,10 @@ const updateLocation = async (req, res) => {
       });
     }
 
-    if (!parsedTimestamp) {
+    if (!parsedTimestamp || parsedTimestamp.getTime() > Date.now() + 5 * 60 * 1000) {
       return res.status(400).json({
         success: false,
-        message: "Invalid timestamp.",
+        message: "Invalid timestamp. Future timestamps are not accepted.",
       });
     }
 
@@ -188,7 +191,8 @@ const getAlertLocations = async (req, res) => {
 
     const locations = await LocationHistory.find({ alertId, userId })
       .sort({ timestamp: 1 })
-      .select("latitude longitude accuracy timestamp -_id");
+      .select("latitude longitude accuracy timestamp -_id")
+      .limit(5000);
 
     return res.status(200).json({
       success: true,

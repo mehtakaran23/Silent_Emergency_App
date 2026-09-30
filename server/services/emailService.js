@@ -2,6 +2,43 @@ const nodemailer = require("nodemailer");
 const User = require("../models/User");
 const Contact = require("../models/Contact");
 const NotificationLog = require("../models/NotificationLog");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+
+const RESPONSE_TOKEN_TTL = process.env.CONTACT_RESPONSE_TOKEN_TTL || "7d";
+const responseSecret = () => process.env.CONTACT_RESPONSE_SECRET || process.env.JWT_SECRET;
+
+const createContactResponseToken = (alert, contact) => {
+  const jti = crypto.randomBytes(24).toString("hex");
+  const secret = responseSecret();
+  if (!secret) {
+    throw new Error("CONTACT_RESPONSE_SECRET or JWT_SECRET is not configured");
+  }
+
+  const token = jwt.sign(
+    {
+      alertId: alert._id.toString(),
+      contactId: contact._id.toString(),
+      jti,
+    },
+    secret,
+    { expiresIn: RESPONSE_TOKEN_TTL }
+  );
+
+  return {
+    token,
+    tokenHash: crypto.createHash("sha256").update(jti).digest("hex"),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  };
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 /**
  * Creates a Nodemailer transporter based on SMTP configuration in .env.
@@ -79,10 +116,22 @@ const sendSOSNotificationEmails = async (alert) => {
         ? new Date(alert.triggeredAt).toUTCString()
         : new Date().toUTCString();
 
+      let responseToken = null;
+      try {
+        responseToken = createContactResponseToken(alert, contact);
+      } catch (tokenError) {
+        console.error("Could not create contact response token:", tokenError);
+      }
+
+      const responseUrl = responseToken
+        ? `${process.env.CLIENT_URL || "http://localhost:5173"}/respond/${responseToken.token}`
+        : null;
+      const safeUserName = escapeHtml(user.name);
+      const safeStatus = escapeHtml(alert.status);
       const mailOptions = {
         from: process.env.EMAIL_FROM || smtpUser || "no-reply@silent-sos.com",
         to: contact.email,
-        subject: `EMERGENCY ALERT: ${user.name} is in danger!`,
+        subject: `EMERGENCY ALERT: ${user.name} needs help`,
         text: `EMERGENCY ALERT\n\n` +
               `Your emergency contact, ${user.name}, has triggered a Silent SOS alert.\n\n` +
               `Status: ${alert.status}\n` +
@@ -91,19 +140,20 @@ const sendSOSNotificationEmails = async (alert) => {
                 ? `Location Coordinates: ${latitude}, ${longitude}\n` +
                   `Google Maps Location: ${mapsLink}\n`
                 : `Location: Not Available\n`) +
-              `\nPlease check on them or contact emergency services immediately.`,
+              `\nPlease check on them or contact emergency services immediately.` +
+              (responseUrl ? `\n\nIf you are safe to do so, acknowledge this alert: ${responseUrl}` : ""),
         html: `
           <div style="font-family: Arial, sans-serif; padding: 20px; border: 2px solid #ff4d4d; border-radius: 10px; max-width: 600px; margin: 0 auto; background-color: #fffafb;">
             <h2 style="color: #d9534f; margin-top: 0; text-transform: uppercase; border-bottom: 2px solid #ff4d4d; padding-bottom: 10px;">
               🚨 Emergency SOS Alert 🚨
             </h2>
             <p style="font-size: 16px; line-height: 1.5; color: #333;">
-              Your emergency contact, <strong>${user.name}</strong>, has triggered an emergency Silent SOS alert.
+              Your emergency contact,               <strong>${safeUserName}</strong>, has triggered an emergency Silent SOS alert.
             </p>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 15px;">
               <tr style="background-color: #f9f9f9;">
                 <td style="padding: 10px; border: 1px solid #eee; font-weight: bold; width: 30%;">Status:</td>
-                <td style="padding: 10px; border: 1px solid #eee; color: #d9534f; font-weight: bold;">${alert.status}</td>
+                <td style="padding: 10px; border: 1px solid #eee; color: #d9534f; font-weight: bold;">${safeStatus}</td>
               </tr>
               <tr>
                 <td style="padding: 10px; border: 1px solid #eee; font-weight: bold;">Alert Time:</td>
@@ -121,6 +171,7 @@ const sendSOSNotificationEmails = async (alert) => {
                 </td>
               </tr>
             </table>
+            ${responseUrl ? `<p style="font-size: 14px; background-color: #f0f7ff; padding: 15px; border-left: 4px solid #337ab7; border-radius: 4px; margin-top: 25px;"><a href="${escapeHtml(responseUrl)}" style="color: #337ab7; font-weight: bold;">Acknowledge this alert securely</a></p>` : ""}
             <p style="font-size: 14px; color: #555; background-color: #fff3f3; padding: 15px; border-left: 4px solid #d9534f; border-radius: 4px; margin-top: 25px;">
               <strong>Important:</strong> Please try contacting ${user.name} or reach out to local emergency authorities if they do not respond.
             </p>
@@ -159,6 +210,8 @@ const sendSOSNotificationEmails = async (alert) => {
           status,
           sentAt: new Date(),
           error: errorMsg,
+          responseTokenHash: responseToken?.tokenHash || null,
+          responseTokenExpiresAt: responseToken?.expiresAt || null,
         });
       } catch (dbError) {
         console.error(`Failed to create NotificationLog for contact ${contact.email}:`, dbError);
@@ -171,4 +224,5 @@ const sendSOSNotificationEmails = async (alert) => {
 
 module.exports = {
   sendSOSNotificationEmails,
+  createContactResponseToken,
 };

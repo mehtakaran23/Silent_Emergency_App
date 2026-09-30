@@ -88,6 +88,26 @@ export const onSOSResolved = (callback) => {
   }
 };
 
+export const onContactAcknowledged = (callback) => {
+  const currentSocket = getSocket();
+  if (currentSocket) currentSocket.on("contact:acknowledged", callback);
+};
+
+export const offContactAcknowledged = (callback) => {
+  const currentSocket = getSocket();
+  if (currentSocket) currentSocket.off("contact:acknowledged", callback);
+};
+
+export const onSOSAcknowledged = (callback) => {
+  const currentSocket = getSocket();
+  if (currentSocket) currentSocket.on("sos:acknowledged", callback);
+};
+
+export const offSOSAcknowledged = (callback) => {
+  const currentSocket = getSocket();
+  if (currentSocket) currentSocket.off("sos:acknowledged", callback);
+};
+
 export const offSOSStarted = (callback) => {
   const currentSocket = getSocket();
   if (currentSocket) {

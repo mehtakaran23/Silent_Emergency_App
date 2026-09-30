@@ -349,6 +349,15 @@ const deleteContact = async (req, res) => {
       });
     }
 
+    if (deletedContact.isPrimary) {
+      const replacement = await Contact.findOne({ user: userId })
+        .sort({ priority: 1, createdAt: 1 });
+      if (replacement) {
+        replacement.isPrimary = true;
+        await replacement.save();
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: "Emergency contact deleted successfully.",

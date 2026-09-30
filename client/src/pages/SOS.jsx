@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import API from "../services/api";
 import {
   initializeSocket,
-  disconnectSocket,
   joinAlertRoom,
   onLocationUpdate,
   onSOSResolved,
+  onContactAcknowledged,
   offLocationUpdate,
   offSOSResolved,
+  offContactAcknowledged,
 } from "../services/socket";
 
 const SOS = () => {
@@ -29,6 +30,7 @@ const SOS = () => {
   // Live location state
   const [lastLocationUpdate, setLastLocationUpdate] = useState(null);
   const [isResolvingLoading, setIsResolvingLoading] = useState(false);
+  const [acknowledgements, setAcknowledgements] = useState([]);
   
   const PRESS_DURATION = 3000; // 3 seconds in milliseconds
   const PROGRESS_UPDATE_INTERVAL = 50; // Update progress every 50ms
@@ -40,6 +42,13 @@ const SOS = () => {
         const res = await API.get("/sos/active");
         if (res.data?.success && res.data?.alert) {
           setActiveSOS(res.data.alert);
+          setAcknowledgements(res.data.alert.contactAcknowledgements || []);
+          setLastLocationUpdate(
+            Number.isFinite(res.data.alert.currentLocation?.latitude) &&
+            Number.isFinite(res.data.alert.currentLocation?.longitude)
+              ? res.data.alert.currentLocation
+              : null
+          );
         }
       } catch (err) {
         console.error("Error fetching active SOS:", err);
@@ -210,6 +219,7 @@ const SOS = () => {
         setSuccess("SOS alert has been resolved. Tracking stopped.");
         setActiveSOS(null);
         setLastLocationUpdate(null);
+        setAcknowledgements([]);
       } else {
         setError(res.data?.message || "Failed to resolve SOS.");
       }
@@ -233,14 +243,14 @@ const SOS = () => {
 
       // Listen for location updates
       const handleLocationUpdate = (data) => {
-        if (data && data.alertId === activeSOS._id) {
-          setLastLocationUpdate(data);
+        if (data && String(data.alertId) === String(activeSOS._id)) {
+          setLastLocationUpdate(data.location || data.alertLocation || null);
         }
       };
 
       // Listen for SOS resolution
       const handleSOSResolved = (data) => {
-        if (data && data.alertId === activeSOS._id) {
+        if (data && String(data.alertId) === String(activeSOS._id)) {
           // Clear active SOS after brief delay to show confirmation
           setTimeout(() => {
             setActiveSOS(null);
@@ -252,11 +262,22 @@ const SOS = () => {
 
       onLocationUpdate(handleLocationUpdate);
       onSOSResolved(handleSOSResolved);
+      const handleContactAcknowledged = (data) => {
+        if (data && String(data.alertId) === String(activeSOS._id)) {
+          setAcknowledgements((current) => {
+            if (current.some((item) => String(item.contactId) === String(data.contactId))) return current;
+            return [...current, data];
+          });
+          setSuccess(`${data.contactName || "An emergency contact"} acknowledged the alert.`);
+        }
+      };
+      onContactAcknowledged(handleContactAcknowledged);
 
       // Cleanup listeners
       return () => {
         offLocationUpdate(handleLocationUpdate);
         offSOSResolved(handleSOSResolved);
+        offContactAcknowledged(handleContactAcknowledged);
       };
     }
   }, [activeSOS]);
@@ -343,6 +364,11 @@ const SOS = () => {
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
               Emergency contacts are being notified. Location data is being tracked continuously.
             </p>
+            {acknowledgements.length > 0 && (
+              <p style={{ fontSize: "13px", color: "var(--accent-blue)", marginBottom: "20px" }}>
+                ✅ {acknowledgements.length} contact{acknowledgements.length === 1 ? "" : "s"} acknowledged this alert.
+              </p>
+            )}
 
             {/* Resolve Button */}
             <button
@@ -466,7 +492,7 @@ const SOS = () => {
       </div>
 
       <div style={{ marginTop: "24px" }}>
-        <Link to="/dashboard" className="btn btn-secondary">
+        <Link to="/" className="btn btn-secondary">
           ⬅️ Back to Dashboard
         </Link>
       </div>

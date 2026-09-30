@@ -1,36 +1,33 @@
 import axios from "axios";
+import { disconnectSocket } from "./socket";
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
-// Request interceptor to automatically attach Authorization header
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("sos_token");
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle errors globally, especially 401 Unauthorized
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Clear token from localStorage
+    if (error.response?.status === 401) {
       localStorage.removeItem("sos_token");
-      
-      // Redirect to login if not already there
-      const isAuthPage = window.location.pathname.includes("/login") || window.location.pathname.includes("/register");
+      localStorage.removeItem("sos_user");
+      disconnectSocket();
+      const isAuthPage = ["/login", "/register"].some((path) =>
+        window.location.pathname.includes(path)
+      );
       if (!isAuthPage) {
         window.location.href = "/login?expired=true";
       }
@@ -38,5 +35,11 @@ API.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const getContactResponse = (token) =>
+  API.get(`/sos/respond/${encodeURIComponent(token)}`);
+
+export const acknowledgeContactAlert = (token) =>
+  API.post(`/sos/respond/${encodeURIComponent(token)}/acknowledge`);
 
 export default API;

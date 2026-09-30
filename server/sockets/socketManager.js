@@ -41,6 +41,9 @@ const authenticateSocket = (socket, next) => {
 };
 
 const canJoinAlertRoom = async (userId, alertId) => {
+  if (!alertId || !require("mongoose").Types.ObjectId.isValid(alertId)) {
+    return { allowed: false, reason: "Invalid alert id." };
+  }
   const alert = await Alert.findById(alertId).select("userId");
 
   if (!alert) {
@@ -100,6 +103,12 @@ const initializeSocket = (server) => {
         if (typeof ack === "function") {
           ack({ success: false, message: "Unable to join alert room." });
         }
+      }
+    });
+
+    socket.on("alert:leave", (payload) => {
+      if (payload?.alertId) {
+        socket.leave(`alert:${payload.alertId}`);
       }
     });
   });

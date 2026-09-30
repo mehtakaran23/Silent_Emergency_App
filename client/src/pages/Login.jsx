@@ -3,7 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -28,12 +28,12 @@ const Login = () => {
     setError("");
     setSuccess("");
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       setError("Please fill in all fields.");
       return;
     }
 
-    const res = await login(email, password);
+    const res = await login(identifier, password);
     if (res.success) {
       setSuccess("Logged in successfully!");
       setTimeout(() => {
@@ -57,13 +57,13 @@ const Login = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Email Address</label>
+            <label className="form-label">Email or phone</label>
             <input
-              type="email"
+              type="text"
               className="form-control"
-              placeholder="e.g. john@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. john@example.com or +15555555555"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               disabled={loading}
             />

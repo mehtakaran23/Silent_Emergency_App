@@ -29,6 +29,7 @@ const AlertHistory = () => {
     switch (status) {
       case "TRIGGERED":
       case "ACTIVE":
+      case "ACKNOWLEDGED":
         return "badge badge-active";
       case "RESOLVED":
         return "badge badge-resolved";

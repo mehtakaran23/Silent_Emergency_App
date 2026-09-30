@@ -25,8 +25,8 @@ const Register = () => {
     setError("");
     setSuccess("");
 
-    if (!name || !email || !phone || !password) {
-      setError("Please fill in all required fields.");
+    if (!name || (!email && !phone) || !password) {
+      setError("Please provide your name, password, and an email or phone.");
       return;
     }
 
@@ -84,7 +84,6 @@ const Register = () => {
               placeholder="e.g. john@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
               disabled={loading}
             />
           </div>
@@ -97,7 +96,6 @@ const Register = () => {
               placeholder="e.g. +15555555555"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              required
               disabled={loading}
             />
           </div>
@@ -111,6 +109,7 @@ const Register = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              required
               disabled={loading}
             />
           </div>
@@ -123,6 +122,7 @@ const Register = () => {
               placeholder="Repeat password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              required
               required
               disabled={loading}
             />

@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(protect);
 
 router.post("/update", updateLocation);
+router.post("/", updateLocation);
 router.get("/:alertId", getAlertLocations);
 
 module.exports = router;

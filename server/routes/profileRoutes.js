@@ -8,10 +8,10 @@ const {
 
 const router = express.Router();
 
-console.log("✅ profileRoutes.js loaded");
-
 router.get("/me", protect, getMyProfile);
+router.get("/", protect, getMyProfile);
 
 router.put("/me", protect, updateMyProfile);
+router.put("/", protect, updateMyProfile);
 
 module.exports = router;

@@ -39,6 +39,21 @@ const notificationLogSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    responseTokenHash: {
+      type: String,
+      default: null,
+      index: true,
+      select: false,
+    },
+    responseTokenExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    acknowledgedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
