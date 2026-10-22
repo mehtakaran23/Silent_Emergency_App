@@ -61,6 +61,27 @@ const getSafeMailOptions = (mailOptions) => ({
   hasHtml: Boolean(mailOptions.html),
 });
 
+const withTimeout = (operation, timeoutMs, operationName) =>
+  new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      const error = new Error(`${operationName} timed out after ${timeoutMs}ms.`);
+      error.code = "ETIMEDOUT";
+      error.command = operationName;
+      reject(error);
+    }, timeoutMs);
+
+    Promise.resolve()
+      .then(operation)
+      .then((result) => {
+        clearTimeout(timeout);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+
 const createContactResponseToken = (alert, contact) => {
   const jti = crypto.randomBytes(24).toString("hex");
   const secret = responseSecret();
@@ -109,6 +130,9 @@ const createTransporter = () => {
     port: config.port,
     family: 4,
     secure: config.secure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
       user: config.user,
       pass: config.pass,
@@ -167,7 +191,7 @@ const sendSOSNotificationEmails = async (alert) => {
       transporter = createTransporter();
       console.log(`Verifying SMTP transporter for ${smtpConfig.host}:${smtpConfig.port} over IPv4.`);
       try {
-        await transporter.verify();
+        await withTimeout(() => transporter.verify(), 15000, "SMTP verify");
         console.log("SMTP transporter.verify() succeeded.");
       } catch (verifyError) {
         const verifyMessage = getSafeSMTPError(verifyError);
@@ -177,6 +201,7 @@ const sendSOSNotificationEmails = async (alert) => {
     }
 
     // 4. Iterate over contacts and send emails
+    console.log(`Entering SOS email send loop for alert ${alert._id}.`);
     for (const contact of contacts) {
       if (!contact.email) {
         console.log(`Skipping emergency contact ${contact._id}: no email address configured.`);
@@ -277,9 +302,15 @@ const sendSOSNotificationEmails = async (alert) => {
       } else if (!transporter) {
         status = "FAILED";
         errorMsg = "SMTP transporter verification failed; see server logs for the sanitized provider error.";
+        console.error(`EMAIL NOT SENT — SMTP verification did not succeed (recipient: ${contact.email}).`);
       } else {
         try {
-          const result = await transporter.sendMail(mailOptions);
+          console.log(`Starting SMTP sendMail for alert ${alert._id} to ${contact.email}.`);
+          const result = await withTimeout(
+            () => transporter.sendMail(mailOptions),
+            30000,
+            "SMTP sendMail"
+          );
           console.log("SMTP sendMail result:", {
             accepted: result.accepted,
             rejected: result.rejected,
@@ -298,7 +329,7 @@ const sendSOSNotificationEmails = async (alert) => {
         } catch (emailError) {
           status = "FAILED";
           errorMsg = getSafeSMTPError(emailError);
-          console.error(`EMAIL NOT SENT — SMTP delivery failed (recipient: ${contact.email}; ${errorMsg})`);
+          console.error(`SMTP sendMail failed for ${contact.email}: ${errorMsg}`);
         }
       }
 
