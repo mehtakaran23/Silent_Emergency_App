@@ -107,6 +107,7 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     host: config.host,
     port: config.port,
+    family: 4,
     secure: config.secure,
     auth: {
       user: config.user,
