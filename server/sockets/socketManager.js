@@ -6,11 +6,17 @@ let ioInstance = null;
 
 const getAllowedOrigins = () => {
   const origins = [
-    process.env.CLIENT_URL,
-    process.env.SOCKET_CORS_ORIGIN,
+    "https://silent-emergency-app-six.vercel.app",
+    "https://silent-emergency-ll5cz5yz1-mehtakaran23s-projects.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    ...(process.env.CLIENT_URL || "").split(","),
+    ...(process.env.SOCKET_CORS_ORIGIN || "").split(","),
   ].filter(Boolean);
 
-  return [...new Set(origins)];
+  return [...new Set(origins.map((origin) => origin.trim()).filter(Boolean))];
 };
 
 const getTokenFromSocket = (socket) => {

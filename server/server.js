@@ -18,32 +18,38 @@ const { getSMTPStatusMessage } = require("./services/emailService");
 
 const getAllowedOrigins = () => {
   const origins = [
-    process.env.CLIENT_URL,
-    process.env.SOCKET_CORS_ORIGIN,
+    "https://silent-emergency-app-six.vercel.app",
+    "https://silent-emergency-ll5cz5yz1-mehtakaran23s-projects.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    ...(process.env.CLIENT_URL || "").split(","),
+    ...(process.env.SOCKET_CORS_ORIGIN || "").split(","),
   ].filter(Boolean);
 
-  return [...new Set(origins)];
+  return [...new Set(origins.map((origin) => origin.trim()).filter(Boolean))];
 };
 
 const app = express();
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = getAllowedOrigins();
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
 app.use(helmet());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      const allowedOrigins = getAllowedOrigins();
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(null, false);
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.options(/.*/, cors(corsOptions));
+app.use(cors(corsOptions));
 
 app.use(morgan((tokens, req, res) => {
   const safeUrl = req.originalUrl.replace(
