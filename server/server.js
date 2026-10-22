@@ -32,6 +32,11 @@ const getAllowedOrigins = () => {
 };
 
 const app = express();
+// Render places one trusted reverse proxy in front of the application.
+// Trusting exactly one hop lets express-rate-limit use X-Forwarded-For
+// without accepting an arbitrary client-supplied proxy chain.
+app.set("trust proxy", 1);
+
 const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = getAllowedOrigins();

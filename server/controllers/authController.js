@@ -152,6 +152,12 @@ const loginUser = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Login failed:", {
+            name: error?.name,
+            message: error?.message,
+            code: error?.code,
+            stack: error?.stack,
+        });
 
         res.status(500).json({
             success: false,
