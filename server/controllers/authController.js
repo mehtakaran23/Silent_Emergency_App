@@ -5,6 +5,23 @@ const jwt = require("jsonwebtoken");
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^[0-9+()\-\s]{7,20}$/;
 
+const logAuthError = (operation, error) => {
+    console.error(`${operation} failed:`, {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+    });
+};
+
+const getValidationMessage = (error) => {
+    const messages = Object.values(error?.errors || {})
+        .map((validationError) => validationError?.message)
+        .filter(Boolean);
+
+    return messages.length > 0 ? messages.join(" ") : "Submitted account data is invalid.";
+};
+
 const publicUser = (user) => ({
     _id: user._id,
     name: user.name,
@@ -68,9 +85,9 @@ const registerUser = async (req, res) => {
         });
 
         if (existingUser) {
-            return res.status(400).json({
+            return res.status(409).json({
                 success: false,
-                message: "User already exists"
+                message: "An account with this email or phone already exists."
             });
         }
 
@@ -91,8 +108,20 @@ const registerUser = async (req, res) => {
 
     } catch (error) {
         if (error.code === 11000) {
-            return res.status(409).json({ success: false, message: "An account with this email already exists." });
+            const duplicateField = Object.keys(error.keyPattern || {})[0];
+            const duplicateMessage = duplicateField === "phone"
+                ? "An account with this phone number already exists."
+                : "An account with this email already exists.";
+            return res.status(409).json({ success: false, message: duplicateMessage });
         }
+        if (error.name === "ValidationError") {
+            logAuthError("Registration validation", error);
+            return res.status(400).json({
+                success: false,
+                message: getValidationMessage(error),
+            });
+        }
+        logAuthError("Registration", error);
         res.status(500).json({
             success: false,
             message: "Error registering user",
@@ -152,12 +181,7 @@ const loginUser = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Login failed:", {
-            name: error?.name,
-            message: error?.message,
-            code: error?.code,
-            stack: error?.stack,
-        });
+        logAuthError("Login", error);
 
         res.status(500).json({
             success: false,
