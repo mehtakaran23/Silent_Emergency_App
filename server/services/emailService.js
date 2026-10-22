@@ -137,6 +137,8 @@ const sendSOSNotificationEmails = async (alert) => {
       return;
     }
 
+    console.log(`Starting SOS email notification flow for alert ${alert._id}.`);
+
     // 1. Fetch user to retrieve their name
     const user = await User.findById(alert.userId);
     if (!user) {
@@ -147,9 +149,14 @@ const sendSOSNotificationEmails = async (alert) => {
     // 2. Fetch all emergency contacts for the user
     const contacts = await Contact.find({ user: alert.userId });
     if (!contacts || contacts.length === 0) {
-      console.log(`No emergency contacts configured for user: ${user.name} (${user._id})`);
+      console.log(`No emergency contacts configured for alert ${alert._id}.`);
       return;
     }
+    const emailContacts = contacts.filter((contact) => Boolean(contact.email));
+    console.log(
+      `Found ${contacts.length} emergency contact(s) for alert ${alert._id}; ` +
+      `${emailContacts.length} have an email address.`
+    );
 
     // 3. Check for SMTP config
     const smtpConfig = getSMTPConfiguration();
@@ -158,6 +165,7 @@ const sendSOSNotificationEmails = async (alert) => {
     let transporter = null;
     if (isSmtpConfigured) {
       transporter = createTransporter();
+      console.log(`Verifying SMTP transporter for ${smtpConfig.host}:${smtpConfig.port} over IPv4.`);
       try {
         await transporter.verify();
         console.log("SMTP transporter.verify() succeeded.");
@@ -171,6 +179,7 @@ const sendSOSNotificationEmails = async (alert) => {
     // 4. Iterate over contacts and send emails
     for (const contact of contacts) {
       if (!contact.email) {
+        console.log(`Skipping emergency contact ${contact._id}: no email address configured.`);
         continue;
       }
 
@@ -307,11 +316,20 @@ const sendSOSNotificationEmails = async (alert) => {
           responseTokenExpiresAt: responseToken?.expiresAt || null,
         });
       } catch (dbError) {
-        console.error(`Failed to create NotificationLog for contact ${contact.email}:`, dbError);
+        console.error(`Failed to create NotificationLog for contact ${contact.email}:`, {
+          name: dbError?.name,
+          message: dbError?.message,
+          code: dbError?.code,
+        });
       }
     }
   } catch (error) {
-    console.error("Critical error in sendSOSNotificationEmails service:", error);
+    console.error("Critical error in sendSOSNotificationEmails service:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+    });
   }
 };
 
