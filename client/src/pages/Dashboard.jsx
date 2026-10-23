@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import ResendTestModeNotice from "../components/ResendTestModeNotice";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -64,8 +63,6 @@ const Dashboard = () => {
       </div>
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
-      <ResendTestModeNotice />
-
       {loading ? (
         <div className="spinner"></div>
       ) : (

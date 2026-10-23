@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
-import ResendTestModeNotice from "../components/ResendTestModeNotice";
 
 const EmergencyContacts = () => {
   const [contacts, setContacts] = useState([]);
@@ -148,8 +147,6 @@ const EmergencyContacts = () => {
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
       {success && <div className="alert-banner alert-banner-success">{success}</div>}
-      <ResendTestModeNotice />
-
       {loading ? (
         <div className="spinner"></div>
       ) : contacts.length === 0 ? (

@@ -213,6 +213,18 @@ const sendWithGmail = async (gmailClient, mailOptions) => {
   return messageId;
 };
 
+const sendGmailMessagesToContacts = async (gmailClient, mailOptionsList) =>
+  Promise.all(
+    mailOptionsList.map(async (mailOptions) => {
+      try {
+        const messageId = await sendWithGmail(gmailClient, mailOptions);
+        return { mailOptions, messageId, error: null };
+      } catch (error) {
+        return { mailOptions, messageId: null, error };
+      }
+    })
+  );
+
 const getEmailProviderStatusMessage = () => {
   const provider = getEmailProvider();
   if (provider === "gmail") {
@@ -404,11 +416,15 @@ const sendSOSNotificationEmails = async (alert) => {
         try {
           if (provider === "gmail") {
             console.log(`Starting Gmail API email for alert ${alert._id} to ${recipient}.`);
-            const messageId = await withTimeout(
-              () => sendWithGmail(gmailClient, mailOptions),
+            const [gmailResult] = await withTimeout(
+              () => sendGmailMessagesToContacts(gmailClient, [mailOptions]),
               30000,
               "Gmail API email send"
             );
+            if (gmailResult.error) {
+              throw gmailResult.error;
+            }
+            const messageId = gmailResult.messageId;
             console.log(`Gmail API accepted email for ${recipient}; id=${messageId}.`);
           } else {
             console.log(`Starting Resend email for alert ${alert._id} to ${recipient}.`);
@@ -478,4 +494,5 @@ module.exports = {
   getSafeGmailError,
   buildRawGmailMessage,
   sendWithGmail,
+  sendGmailMessagesToContacts,
 };

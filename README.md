@@ -96,8 +96,8 @@ Set `EMAIL_PROVIDER=resend` to retain the existing Resend integration.
 The current zero-cost demo intentionally uses Resend test mode. When
 `RESEND_TEST_RECIPIENT` is configured, the backend sends only to that
 authorized Resend account email and skips other saved contact recipients.
-The UI labels this restriction clearly. A Resend API acceptance ID means the
-provider accepted the request; it does not by itself prove inbox delivery.
+Resend API acceptance means the provider accepted the request; it does not by
+itself prove inbox delivery.
 
 To send to real emergency contacts later, configure a verified Resend sending
 domain and remove the test recipient restriction in a deliberate production

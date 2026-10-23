@@ -11,7 +11,6 @@ import {
   offSOSResolved,
   offContactAcknowledged,
 } from "../services/socket";
-import ResendTestModeNotice from "../components/ResendTestModeNotice";
 
 const SOS = () => {
   const [activeSOS, setActiveSOS] = useState(null);
@@ -328,8 +327,6 @@ const SOS = () => {
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
       {success && <div className="alert-banner alert-banner-success">{success}</div>}
-      <ResendTestModeNotice />
-
       <div className="card sos-trigger-card">
         {activeSOS ? (
           <div style={{ padding: "24px 0" }}>
