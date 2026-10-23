@@ -6,6 +6,13 @@ node_modules/
 .env.*
 !.env.example
 
+# Local Gmail OAuth credentials and generated authorization files
+server/credentials/
+server/credentials/gmail-oauth-client.json
+server/credentials/gmail-oauth-token.json
+server/gmail-oauth-token.json
+server/.oauth/
+
 # Logs
 *.log
 npm-debug.log*

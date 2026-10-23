@@ -1,4 +1,5 @@
 const { Resend } = require("resend");
+const { google } = require("googleapis");
 const User = require("../models/User");
 const Contact = require("../models/Contact");
 const NotificationLog = require("../models/NotificationLog");
@@ -33,6 +34,34 @@ const getResendConfiguration = () => {
   };
 };
 
+const getGmailConfiguration = () => {
+  const clientId = String(process.env.GMAIL_CLIENT_ID || "").trim();
+  const clientSecret = String(process.env.GMAIL_CLIENT_SECRET || "").trim();
+  const refreshToken = String(process.env.GMAIL_REFRESH_TOKEN || "").trim();
+  const senderEmail = String(process.env.GMAIL_SENDER_EMAIL || "").trim().toLowerCase();
+  const missing = [];
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!clientId) missing.push("GMAIL_CLIENT_ID");
+  if (!clientSecret) missing.push("GMAIL_CLIENT_SECRET");
+  if (!refreshToken) missing.push("GMAIL_REFRESH_TOKEN");
+  if (!senderEmail) missing.push("GMAIL_SENDER_EMAIL");
+  if (senderEmail && !emailPattern.test(senderEmail)) {
+    missing.push("GMAIL_SENDER_EMAIL_FORMAT");
+  }
+
+  return {
+    configured: missing.length === 0,
+    missing,
+    clientId,
+    clientSecret,
+    refreshToken,
+    senderEmail,
+  };
+};
+
+const getEmailProvider = () => String(process.env.EMAIL_PROVIDER || "resend").trim().toLowerCase();
+
 const getSafeResendError = (error) => {
   const details = [
     error?.message,
@@ -42,6 +71,17 @@ const getSafeResendError = (error) => {
     error?.response ? `response=${String(error.response).replace(/\s+/g, " ").slice(0, 500)}` : null,
   ].filter(Boolean);
   return details.join("; ") || "Resend API returned an unknown error.";
+};
+
+const getSafeGmailError = (error) => {
+  const details = [
+    error?.message,
+    error?.name ? `name=${error.name}` : null,
+    error?.code ? `code=${error.code}` : null,
+    error?.response?.status ? `status=${error.response.status}` : null,
+    error?.response?.statusText ? `statusText=${error.response.statusText}` : null,
+  ].filter(Boolean);
+  return details.join("; ") || "Gmail API returned an unknown error.";
 };
 
 const getSafeMailOptions = (mailOptions) => ({
@@ -116,7 +156,71 @@ const createResendClient = () => {
   return new Resend(config.apiKey);
 };
 
-const getResendStatusMessage = () => {
+const createGmailClient = (gmail = google.gmail) => {
+  const config = getGmailConfiguration();
+  if (!config.configured) {
+    throw new Error(`Gmail configuration is incomplete. Missing: ${config.missing.join(", ")}`);
+  }
+
+  const auth = new google.auth.OAuth2(
+    config.clientId,
+    config.clientSecret
+  );
+  auth.setCredentials({ refresh_token: config.refreshToken });
+  return gmail({ version: "v1", auth });
+};
+
+const encodeBase64Url = (value) =>
+  Buffer.from(value, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+
+const buildRawGmailMessage = (mailOptions) => {
+  const headers = [
+    `From: ${mailOptions.from}`,
+    `To: ${mailOptions.to}`,
+    `Subject: ${mailOptions.subject}`,
+    "MIME-Version: 1.0",
+    'Content-Type: multipart/alternative; boundary="silent-sos-boundary"',
+  ];
+  const body = [
+    ...headers,
+    "",
+    "--silent-sos-boundary",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    mailOptions.text,
+    "--silent-sos-boundary",
+    'Content-Type: text/html; charset="UTF-8"',
+    "",
+    mailOptions.html,
+    "--silent-sos-boundary--",
+  ].join("\r\n");
+  return encodeBase64Url(body);
+};
+
+const sendWithGmail = async (gmailClient, mailOptions) => {
+  const result = await gmailClient.users.messages.send({
+    userId: "me",
+    requestBody: { raw: buildRawGmailMessage(mailOptions) },
+  });
+  const messageId = result?.data?.id;
+  if (!messageId) {
+    throw new Error("Gmail API returned no message ID.");
+  }
+  return messageId;
+};
+
+const getEmailProviderStatusMessage = () => {
+  const provider = getEmailProvider();
+  if (provider === "gmail") {
+    const config = getGmailConfiguration();
+    return config.configured
+      ? `Gmail API configuration detected (sender=${config.senderEmail}; emergency-contact delivery).`
+      : `Gmail API not configured; emergency emails will be recorded as FAILED. Missing: ${config.missing.join(", ")}.`;
+  }
   const config = getResendConfiguration();
   if (config.configured) {
     const mode = config.testRecipient
@@ -125,6 +229,10 @@ const getResendStatusMessage = () => {
     return `Resend configuration detected (sender=${config.from}, mode=${mode}).`;
   }
   return `Resend not configured; emergency emails will be recorded as FAILED. Missing: ${config.missing.join(", ")}.`;
+};
+
+const getResendStatusMessage = () => {
+  return getEmailProviderStatusMessage();
 };
 
 /**
@@ -161,15 +269,24 @@ const sendSOSNotificationEmails = async (alert) => {
       `${emailContacts.length} have an email address.`
     );
 
-    // 3. Configure the Resend HTTPS client. There is no SMTP verification step.
+    // 3. Configure the selected email provider.
+    const provider = getEmailProvider();
     const resendConfig = getResendConfiguration();
-    const isResendConfigured = resendConfig.configured;
+    const gmailConfig = getGmailConfiguration();
+    const providerConfig = provider === "gmail" ? gmailConfig : resendConfig;
+    const isProviderConfigured = providerConfig.configured;
     let resendClient = null;
-    if (isResendConfigured) {
+    let gmailClient = null;
+    if (provider === "gmail" && isProviderConfigured) {
+      gmailClient = createGmailClient();
+      console.log(`Gmail API client initialized for sender ${gmailConfig.senderEmail}.`);
+    } else if (provider === "resend" && isProviderConfigured) {
       resendClient = createResendClient();
       console.log("Resend HTTPS client initialized; no SMTP connection is used.");
-    } else {
-      console.error(`Resend not configured: missing ${resendConfig.missing.join(", ")}.`);
+    } else if (provider !== "gmail" && provider !== "resend") {
+      console.error(`Unsupported EMAIL_PROVIDER=${provider}. Use "gmail" or "resend".`);
+    } else if (!isProviderConfigured) {
+      console.error(`${provider} not configured: missing ${providerConfig.missing.join(", ")}.`);
     }
     const firstEmailContact = resendConfig.testRecipient ? emailContacts[0] : null;
 
@@ -180,7 +297,7 @@ const sendSOSNotificationEmails = async (alert) => {
         console.log(`Skipping emergency contact ${contact._id}: no email address configured.`);
         continue;
       }
-      if (firstEmailContact && String(contact._id) !== String(firstEmailContact._id)) {
+      if (provider === "resend" && firstEmailContact && String(contact._id) !== String(firstEmailContact._id)) {
         console.log(`Skipping emergency contact ${contact._id} while Resend test mode is active.`);
         continue;
       }
@@ -214,9 +331,11 @@ const sendSOSNotificationEmails = async (alert) => {
         : null;
       const safeUserName = escapeHtml(user.name);
       const safeStatus = escapeHtml(alert.status);
-      const recipient = resendConfig.testRecipient || contact.email;
+      const recipient = provider === "resend"
+        ? resendConfig.testRecipient || contact.email
+        : contact.email;
       const mailOptions = {
-        from: resendConfig.from,
+        from: provider === "gmail" ? gmailConfig.senderEmail : resendConfig.from,
         to: recipient,
         subject: `EMERGENCY ALERT: ${user.name} needs help`,
         text: `EMERGENCY ALERT\n\n` +
@@ -273,30 +392,46 @@ const sendSOSNotificationEmails = async (alert) => {
       let errorMsg = null;
       console.log("Prepared emergency email:", getSafeMailOptions(mailOptions));
 
-      if (!isResendConfigured) {
+      if (!isProviderConfigured || (provider !== "gmail" && provider !== "resend")) {
         status = "FAILED";
-        errorMsg = `Resend not configured. Missing: ${resendConfig.missing.join(", ")}.`;
-        console.error(`EMAIL NOT SENT — Resend not configured (recipient: ${resendConfig.testRecipient || "test recipient not configured"}).`);
+        errorMsg = provider === "gmail"
+          ? `Gmail not configured. Missing: ${gmailConfig.missing.join(", ")}.`
+          : provider === "resend"
+            ? `Resend not configured. Missing: ${resendConfig.missing.join(", ")}.`
+            : `Unsupported EMAIL_PROVIDER=${provider}.`;
+        console.error(`EMAIL NOT SENT — ${errorMsg}`);
       } else {
         try {
-          console.log(`Starting Resend email for alert ${alert._id} to ${recipient}.`);
-          const result = await withTimeout(
-            () => resendClient.emails.send(mailOptions),
-            30000,
-            "Resend email send"
-          );
-          if (result?.error) {
-            throw result.error;
+          if (provider === "gmail") {
+            console.log(`Starting Gmail API email for alert ${alert._id} to ${recipient}.`);
+            const messageId = await withTimeout(
+              () => sendWithGmail(gmailClient, mailOptions),
+              30000,
+              "Gmail API email send"
+            );
+            console.log(`Gmail API accepted email for ${recipient}; id=${messageId}.`);
+          } else {
+            console.log(`Starting Resend email for alert ${alert._id} to ${recipient}.`);
+            const result = await withTimeout(
+              () => resendClient.emails.send(mailOptions),
+              30000,
+              "Resend email send"
+            );
+            if (result?.error) {
+              throw result.error;
+            }
+            const resendId = result?.data?.id;
+            if (!resendId) {
+              throw new Error("Resend API returned no message ID.");
+            }
+            console.log(`Resend email accepted for ${recipient}; id=${resendId}.`);
           }
-          const resendId = result?.data?.id;
-          if (!resendId) {
-            throw new Error("Resend API returned no message ID.");
-          }
-          console.log(`Resend email accepted for ${recipient}; id=${resendId}.`);
         } catch (emailError) {
           status = "FAILED";
-          errorMsg = getSafeResendError(emailError);
-          console.error(`Resend email failed for ${recipient}: ${errorMsg}`);
+          errorMsg = provider === "gmail"
+            ? getSafeGmailError(emailError)
+            : getSafeResendError(emailError);
+          console.error(`${provider} email failed for ${recipient}: ${errorMsg}`);
         }
       }
 
@@ -335,6 +470,12 @@ module.exports = {
   sendSOSNotificationEmails,
   createContactResponseToken,
   getResendConfiguration,
+  getGmailConfiguration,
+  getEmailProvider,
   getResendStatusMessage,
+  getEmailProviderStatusMessage,
   getSafeResendError,
+  getSafeGmailError,
+  buildRawGmailMessage,
+  sendWithGmail,
 };

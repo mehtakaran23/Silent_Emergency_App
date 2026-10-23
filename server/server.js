@@ -14,7 +14,7 @@ const sosRoutes = require("./routes/sosRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const { initializeSocket } = require("./sockets/socketManager");
-const { getResendStatusMessage } = require("./services/emailService");
+const { getEmailProviderStatusMessage } = require("./services/emailService");
 
 const getAllowedOrigins = () => {
   const origins = [
@@ -121,7 +121,7 @@ const PORT = Number(process.env.PORT) || 5000;
 const startServer = async () => {
   try {
     await connectDB();
-    console.log(getResendStatusMessage());
+    console.log(getEmailProviderStatusMessage());
 
     const server = http.createServer(app);
     initializeSocket(server);
