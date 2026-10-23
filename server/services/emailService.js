@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const User = require("../models/User");
 const Contact = require("../models/Contact");
 const NotificationLog = require("../models/NotificationLog");
@@ -8,49 +8,35 @@ const jwt = require("jsonwebtoken");
 const RESPONSE_TOKEN_TTL = process.env.CONTACT_RESPONSE_TOKEN_TTL || "7d";
 const responseSecret = () => process.env.CONTACT_RESPONSE_SECRET || process.env.JWT_SECRET;
 
-const getSMTPConfiguration = () => {
-  const host = String(process.env.SMTP_HOST || "").trim();
-  const portValue = String(process.env.SMTP_PORT || "587").trim();
-  const port = Number(portValue);
-  const secureValue = String(process.env.SMTP_SECURE || "false").trim().toLowerCase();
-  const user = String(process.env.SMTP_USER || "").trim();
-  const pass = String(process.env.SMTP_PASS || "");
-  const from = String(process.env.EMAIL_FROM || "").trim();
+const getResendConfiguration = () => {
+  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
+  const from = String(process.env.EMAIL_FROM || "onboarding@resend.dev").trim();
+  const testRecipient = String(process.env.RESEND_TEST_RECIPIENT || "").trim().toLowerCase();
   const missing = [];
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!host) missing.push("SMTP_HOST");
-  if (!Number.isInteger(port) || port < 1 || port > 65535) missing.push("SMTP_PORT");
-  if (!["true", "false"].includes(secureValue)) missing.push("SMTP_SECURE");
-  if (!user) missing.push("SMTP_USER");
-  if (!pass) missing.push("SMTP_PASS");
-  if (!from) missing.push("EMAIL_FROM");
+  if (!apiKey) missing.push("RESEND_API_KEY");
   if (from && !emailPattern.test(from)) missing.push("EMAIL_FROM_FORMAT");
-  if (user && from && from.toLowerCase() !== user.toLowerCase()) {
-    missing.push("EMAIL_FROM_MUST_MATCH_SMTP_USER");
-  }
+  if (testRecipient && !emailPattern.test(testRecipient)) missing.push("RESEND_TEST_RECIPIENT_FORMAT");
 
   return {
     configured: missing.length === 0,
     missing,
-    host,
-    port,
-    secure: secureValue === "true",
-    user,
-    pass,
+    apiKey,
     from,
+    testRecipient,
   };
 };
 
-const getSafeSMTPError = (error) => {
+const getSafeResendError = (error) => {
   const details = [
     error?.message,
+    error?.name ? `name=${error.name}` : null,
+    error?.statusCode ? `statusCode=${error.statusCode}` : null,
     error?.code ? `code=${error.code}` : null,
-    error?.responseCode ? `responseCode=${error.responseCode}` : null,
-    error?.command ? `command=${error.command}` : null,
     error?.response ? `response=${String(error.response).replace(/\s+/g, " ").slice(0, 500)}` : null,
   ].filter(Boolean);
-  return details.join("; ") || "SMTP provider returned an unknown error.";
+  return details.join("; ") || "Resend API returned an unknown error.";
 };
 
 const getSafeMailOptions = (mailOptions) => ({
@@ -116,36 +102,24 @@ const escapeHtml = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-/**
- * Creates a Nodemailer transporter based on SMTP configuration in .env.
- */
-const createTransporter = () => {
-  const config = getSMTPConfiguration();
+const createResendClient = () => {
+  const config = getResendConfiguration();
   if (!config.configured) {
-    throw new Error(`SMTP configuration is incomplete. Missing: ${config.missing.join(", ")}`);
+    throw new Error(`Resend configuration is incomplete. Missing: ${config.missing.join(", ")}`);
   }
 
-  return nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    family: 4,
-    secure: config.secure,
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-    auth: {
-      user: config.user,
-      pass: config.pass,
-    },
-  });
+  return new Resend(config.apiKey);
 };
 
-const getSMTPStatusMessage = () => {
-  const config = getSMTPConfiguration();
+const getResendStatusMessage = () => {
+  const config = getResendConfiguration();
   if (config.configured) {
-    return `SMTP configuration detected (${config.host}:${config.port}, secure=${config.secure}).`;
+    const mode = config.testRecipient
+      ? `initial test recipient ${config.testRecipient}`
+      : "emergency-contact delivery";
+    return `Resend configuration detected (sender=${config.from}, mode=${mode}).`;
   }
-  return `SMTP not configured; emergency emails will be recorded as FAILED. Missing: ${config.missing.join(", ")}.`;
+  return `Resend not configured; emergency emails will be recorded as FAILED. Missing: ${config.missing.join(", ")}.`;
 };
 
 /**
@@ -182,29 +156,27 @@ const sendSOSNotificationEmails = async (alert) => {
       `${emailContacts.length} have an email address.`
     );
 
-    // 3. Check for SMTP config
-    const smtpConfig = getSMTPConfiguration();
-    const isSmtpConfigured = smtpConfig.configured;
-
-    let transporter = null;
-    if (isSmtpConfigured) {
-      transporter = createTransporter();
-      console.log(`Verifying SMTP transporter for ${smtpConfig.host}:${smtpConfig.port} over IPv4.`);
-      try {
-        await withTimeout(() => transporter.verify(), 15000, "SMTP verify");
-        console.log("SMTP transporter.verify() succeeded.");
-      } catch (verifyError) {
-        const verifyMessage = getSafeSMTPError(verifyError);
-        console.error(`SMTP transporter.verify() failed: ${verifyMessage}`);
-        transporter = null;
-      }
+    // 3. Configure the Resend HTTPS client. There is no SMTP verification step.
+    const resendConfig = getResendConfiguration();
+    const isResendConfigured = resendConfig.configured;
+    let resendClient = null;
+    if (isResendConfigured) {
+      resendClient = createResendClient();
+      console.log("Resend HTTPS client initialized; no SMTP connection is used.");
+    } else {
+      console.error(`Resend not configured: missing ${resendConfig.missing.join(", ")}.`);
     }
+    const firstEmailContact = resendConfig.testRecipient ? emailContacts[0] : null;
 
     // 4. Iterate over contacts and send emails
     console.log(`Entering SOS email send loop for alert ${alert._id}.`);
     for (const contact of contacts) {
       if (!contact.email) {
         console.log(`Skipping emergency contact ${contact._id}: no email address configured.`);
+        continue;
+      }
+      if (firstEmailContact && String(contact._id) !== String(firstEmailContact._id)) {
+        console.log(`Skipping emergency contact ${contact._id} while Resend test mode is active.`);
         continue;
       }
 
@@ -237,9 +209,10 @@ const sendSOSNotificationEmails = async (alert) => {
         : null;
       const safeUserName = escapeHtml(user.name);
       const safeStatus = escapeHtml(alert.status);
+      const recipient = resendConfig.testRecipient || contact.email;
       const mailOptions = {
-        from: smtpConfig.from,
-        to: contact.email,
+        from: resendConfig.from,
+        to: recipient,
         subject: `EMERGENCY ALERT: ${user.name} needs help`,
         text: `EMERGENCY ALERT\n\n` +
               `Your emergency contact, ${user.name}, has triggered a Silent SOS alert.\n\n` +
@@ -295,41 +268,30 @@ const sendSOSNotificationEmails = async (alert) => {
       let errorMsg = null;
       console.log("Prepared emergency email:", getSafeMailOptions(mailOptions));
 
-      if (!isSmtpConfigured) {
+      if (!isResendConfigured) {
         status = "FAILED";
-        errorMsg = `SMTP not configured. Missing: ${smtpConfig.missing.join(", ")}.`;
-        console.error(`EMAIL NOT SENT — SMTP NOT CONFIGURED (recipient: ${contact.email}; missing: ${smtpConfig.missing.join(", ")})`);
-      } else if (!transporter) {
-        status = "FAILED";
-        errorMsg = "SMTP transporter verification failed; see server logs for the sanitized provider error.";
-        console.error(`EMAIL NOT SENT — SMTP verification did not succeed (recipient: ${contact.email}).`);
+        errorMsg = `Resend not configured. Missing: ${resendConfig.missing.join(", ")}.`;
+        console.error(`EMAIL NOT SENT — Resend not configured (recipient: ${resendConfig.testRecipient || "test recipient not configured"}).`);
       } else {
         try {
-          console.log(`Starting SMTP sendMail for alert ${alert._id} to ${contact.email}.`);
+          console.log(`Starting Resend email for alert ${alert._id} to ${recipient}.`);
           const result = await withTimeout(
-            () => transporter.sendMail(mailOptions),
+            () => resendClient.emails.send(mailOptions),
             30000,
-            "SMTP sendMail"
+            "Resend email send"
           );
-          console.log("SMTP sendMail result:", {
-            accepted: result.accepted,
-            rejected: result.rejected,
-            response: result.response,
-            messageId: result.messageId,
-          });
-          const accepted = Array.isArray(result.accepted) && result.accepted
-            .some((recipient) => String(recipient).toLowerCase() === contact.email.toLowerCase());
-          if (!accepted) {
-            status = "FAILED";
-            errorMsg = "SMTP accepted no recipient for delivery.";
-            console.error(`EMAIL NOT SENT — SMTP accepted no recipient (recipient: ${contact.email})`);
-          } else {
-            console.log(`Emergency email accepted by SMTP for ${contact.email} (messageId: ${result.messageId || "unknown"}).`);
+          if (result?.error) {
+            throw result.error;
           }
+          const resendId = result?.data?.id;
+          if (!resendId) {
+            throw new Error("Resend API returned no message ID.");
+          }
+          console.log(`Resend email accepted for ${recipient}; id=${resendId}.`);
         } catch (emailError) {
           status = "FAILED";
-          errorMsg = getSafeSMTPError(emailError);
-          console.error(`SMTP sendMail failed for ${contact.email}: ${errorMsg}`);
+          errorMsg = getSafeResendError(emailError);
+          console.error(`Resend email failed for ${recipient}: ${errorMsg}`);
         }
       }
 
@@ -338,7 +300,7 @@ const sendSOSNotificationEmails = async (alert) => {
         await NotificationLog.create({
           alertId: alert._id,
           contactId: contact._id,
-          recipient: contact.email,
+          recipient: mailOptions.to,
           type: "EMAIL",
           status,
           sentAt: new Date(),
@@ -367,7 +329,7 @@ const sendSOSNotificationEmails = async (alert) => {
 module.exports = {
   sendSOSNotificationEmails,
   createContactResponseToken,
-  getSMTPConfiguration,
-  getSMTPStatusMessage,
-  getSafeSMTPError,
+  getResendConfiguration,
+  getResendStatusMessage,
+  getSafeResendError,
 };

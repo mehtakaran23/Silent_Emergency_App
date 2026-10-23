@@ -7,15 +7,17 @@
 3. Run the client with `cd client && npm run dev`.
 
 Set `CLIENT_URL` to the client origin. To deliver emergency email notifications,
-also configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and
-`EMAIL_FROM`. Optionally set a separate `CONTACT_RESPONSE_SECRET` for response
+also configure `RESEND_API_KEY`, `RESEND_TEST_RECIPIENT`, and `EMAIL_FROM`
+(use `onboarding@resend.dev` while testing). Initial Resend test mode sends
+only to `RESEND_TEST_RECIPIENT`; use a verified sending domain and remove that
+test restriction before sending to emergency contacts in production. Optionally
+set a separate `CONTACT_RESPONSE_SECRET` for response
 links (otherwise `JWT_SECRET` is used). Each successful notification contains a signed, expiring response
 link (`/respond/:token`) that lets the recipient acknowledge the alert without
 creating an account. Acknowledgements and live GPS updates are broadcast to the
 authenticated alert owner over Socket.IO.
 
-For Gmail, use a Google App Password rather than the normal account password.
-When SMTP is not configured, email attempts are recorded as `FAILED`; the
+When Resend is not configured, email attempts are recorded as `FAILED`; the
 application never reports undelivered email as successful.
 
 ## API areas
