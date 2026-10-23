@@ -135,14 +135,13 @@ const EmergencyContacts = () => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+      <div className="page-header">
         <div>
-          <h1>Emergency Contacts</h1>
-          <p>Add up to 5 priority contacts for the alert workflow.</p>
+          <div className="eyebrow">Your safety circle</div>
+          <h1>Emergency contacts</h1>
+          <p>Add up to 5 trusted people with current contact details.</p>
         </div>
-        <button onClick={openAddModal} className="btn btn-primary">
-          ➕ Add Contact
-        </button>
+        <button onClick={openAddModal} className="btn btn-primary">Add contact</button>
       </div>
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
@@ -157,13 +156,11 @@ const EmergencyContacts = () => {
       ) : (
         <div className="contacts-grid">
           {contacts.map((contact) => (
-            <div key={contact._id} className="card" style={{ borderLeft: contact.isPrimary ? "4px solid var(--accent-amber)" : "1px solid var(--border-color)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+            <div key={contact._id} className={`card contact-card ${contact.isPrimary ? "is-primary" : ""}`}>
+              <div className="contact-card-header">
                 <div>
-                  <h3 style={{ fontSize: "18px" }}>{contact.name}</h3>
-                  <span style={{ fontSize: "12px", color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>
-                    {contact.relation}
-                  </span>
+                  <h3>{contact.name}</h3>
+                  <span className="contact-relation">{contact.relation}</span>
                 </div>
                 {contact.isPrimary && (
                   <span className="badge badge-pending" style={{ fontSize: "9px" }}>
@@ -172,19 +169,15 @@ const EmergencyContacts = () => {
                 )}
               </div>
               
-              <div style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                {contact.phone && <div>📞 {contact.phone}</div>}
-                {contact.email && <div style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>✉️ {contact.email}</div>}
-                <div>⭐ Priority: {contact.priority}</div>
+              <div className="contact-details">
+                {contact.phone && <div>Phone · {contact.phone}</div>}
+                {contact.email && <div>Email · {contact.email}</div>}
+                <div>Priority · {contact.priority} / 5</div>
               </div>
 
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={() => openEditModal(contact)} className="btn btn-secondary btn-sm" style={{ flex: 1 }}>
-                  ✏️ Edit
-                </button>
-                <button onClick={() => handleDeleteContact(contact._id)} className="btn btn-danger btn-sm" style={{ flex: 1 }}>
-                  🗑️ Delete
-                </button>
+              <div className="contact-actions">
+                <button onClick={() => openEditModal(contact)} className="btn btn-secondary btn-sm">Edit</button>
+                <button onClick={() => handleDeleteContact(contact._id)} className="btn btn-danger btn-sm">Delete</button>
               </div>
             </div>
           ))}

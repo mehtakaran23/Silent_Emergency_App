@@ -7,44 +7,46 @@ const Landing = () => {
 
   return (
     <div className="landing-hero">
-      <h1 style={{ marginBottom: "16px", fontSize: "40px" }}>Silent SOS Protection</h1>
-      <p style={{ fontSize: "16px", marginBottom: "24px" }}>
-        Discreet emergency alerts that notify your emergency contacts instantly. Quietly send details, location coordinates, and automated safety emails when you need help most.
-      </p>
-      
-      <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginBottom: "40px" }}>
-        {isAuthenticated ? (
-          <Link to="/dashboard" className="btn btn-primary">
-            Go to Dashboard
-          </Link>
-        ) : (
-          <>
-            <Link to="/login" className="btn btn-primary">
-              Log In
+      <div className="landing-hero-grid">
+        <section className="landing-copy">
+          <div className="eyebrow">Private safety, when it matters</div>
+          <h1>A quiet signal for the moments you need <span>help.</span></h1>
+          <p>
+            Silent SOS gives you a discreet way to alert trusted people,
+            share your location, and keep a clear record of what happened.
+          </p>
+          <div className="landing-actions">
+            <Link to={isAuthenticated ? "/" : "/register"} className="btn btn-primary">
+              {isAuthenticated ? "Open your dashboard" : "Create your account"}
             </Link>
-            <Link to="/register" className="btn btn-secondary">
-              Create Free Account
-            </Link>
-          </>
-        )}
+            {!isAuthenticated && <Link to="/login" className="btn btn-secondary">Sign in</Link>}
+          </div>
+          <div className="trust-line">
+            <span>✓ No loud alarms</span>
+            <span>✓ You control your contacts</span>
+            <span>✓ Location only during an SOS</span>
+          </div>
+        </section>
+        <aside className="landing-panel" aria-label="Silent SOS overview">
+          <div className="panel-label">Safety control center</div>
+          <div className="signal-card">
+            <div className="signal-icon">SOS</div>
+            <div>
+              <strong>Ready when you are</strong>
+              <p>Hold to activate a discreet alert.</p>
+            </div>
+          </div>
+          <div className="metric-grid">
+            <div className="metric"><div className="metric-value">01</div><div className="metric-label">Private signal</div></div>
+            <div className="metric"><div className="metric-value">24/7</div><div className="metric-label">Your safety history</div></div>
+          </div>
+          <p style={{ marginTop: 22, fontSize: 13 }}>Designed to help you communicate clearly without drawing attention.</p>
+        </aside>
       </div>
-
       <div className="landing-features">
-        <div className="feature-card">
-          <div className="feature-icon">🚨</div>
-          <h3>One-Tap SOS</h3>
-          <p>Instantly alert contacts when you are in an unsafe scenario.</p>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">✉️</div>
-          <h3>Email Alerts</h3>
-          <p>The demo prepares structured emergency emails with maps and coordinates. Resend test mode sends only to its configured test recipient.</p>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">👥</div>
-          <h3>Emergency Contacts</h3>
-          <p>Add, edit, prioritize, and manage up to 5 vital emergency contacts.</p>
-        </div>
+        <div className="feature-card"><div className="feature-icon">◎</div><h3>Discreet SOS</h3><p>Use a deliberate hold gesture to avoid accidental activation.</p></div>
+        <div className="feature-card"><div className="feature-icon">⌖</div><h3>Live location</h3><p>Share valid GPS coordinates while an alert is active.</p></div>
+        <div className="feature-card"><div className="feature-icon">↗</div><h3>Trusted contacts</h3><p>Keep important people organized and informed through secure email alerts.</p></div>
       </div>
     </div>
   );

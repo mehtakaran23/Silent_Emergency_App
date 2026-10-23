@@ -14,61 +14,33 @@ const Layout = ({ children }) => {
   return (
     <div className="layout-container">
       <header className="app-header">
-        <nav className="nav-container">
+        <nav className="nav-container" aria-label="Primary navigation">
           <Link to="/" className="brand-logo">
-            <span>🚨</span> Silent SOS
+            <span className="brand-mark">SOS</span>
+            <span>Silent SOS</span>
           </Link>
-          
           <ul className="nav-links">
             {isAuthenticated ? (
               <>
-                <li>
-                  <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                    Dashboard
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink to="/contacts" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                    Contacts
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                    Profile
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink to="/history" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                    History
-                  </NavLink>
-                </li>
-                <li style={{ marginLeft: "10px" }}>
-                  <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginRight: "10px" }}>
-                    Hi, {user?.name || "User"}
-                  </span>
-                  <button onClick={handleLogout} className="btn btn-secondary btn-sm">
-                    Logout
-                  </button>
+                <li><NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>Overview</NavLink></li>
+                <li><NavLink to="/sos" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>SOS</NavLink></li>
+                <li><NavLink to="/contacts" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>Contacts</NavLink></li>
+                <li><NavLink to="/history" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>History</NavLink></li>
+                <li><NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>Profile</NavLink></li>
+                <li className="nav-user">
+                  <span className="nav-greeting">Hi, {user?.name || "there"}</span>
+                  <button onClick={handleLogout} className="btn btn-secondary btn-sm">Sign out</button>
                 </li>
               </>
             ) : (
               <>
-                <li>
-                  <NavLink to="/login" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                    Login
-                  </NavLink>
-                </li>
-                <li>
-                  <Link to="/register" className="btn btn-primary btn-sm">
-                    Register
-                  </Link>
-                </li>
+                <li><NavLink to="/login" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>Sign in</NavLink></li>
+                <li><Link to="/register" className="btn btn-primary btn-sm">Create account</Link></li>
               </>
             )}
           </ul>
         </nav>
       </header>
-      
       <main className="main-content">{children}</main>
     </div>
   );

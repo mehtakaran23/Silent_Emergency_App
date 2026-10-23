@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -14,138 +14,46 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // 1. Fetch active SOS status
-        const sosRes = await API.get("/sos/active");
-        if (sosRes.data?.success) {
-          setActiveSOS(sosRes.data.alert);
-        }
-
-        // 2. Fetch contacts to count them
-        const contactsRes = await API.get("/contacts");
-        if (contactsRes.data?.success) {
-          setContactsCount(contactsRes.data.contacts?.length || 0);
-        }
-      } catch (err) {
-        console.error("Dashboard fetch error:", err);
-        setError("Could not retrieve dashboard data.");
+        const [sosRes, contactsRes] = await Promise.all([API.get("/sos/active"), API.get("/contacts")]);
+        if (sosRes.data?.success) setActiveSOS(sosRes.data.alert || null);
+        if (contactsRes.data?.success) setContactsCount(contactsRes.data.contacts?.length || 0);
+      } catch {
+        setError("We could not refresh your safety overview.");
       } finally {
         setLoading(false);
       }
     };
-
     fetchDashboardData();
   }, []);
 
+  if (loading) return <div className="spinner" />;
+
   return (
-    <div className="dashboard-container">
-      <div style={{ marginBottom: "24px" }}>
-        <h1>Safety Dashboard</h1>
-        <p>Monitor your alert statuses and manage security contacts.</p>
+    <div>
+      <div className="page-header">
+        <div><div className="eyebrow">Your safety workspace</div><h1>Good to see you, {user?.name?.split(" ")[0] || "there"}.</h1><p>Keep your safety circle ready and know exactly what happens when you need help.</p></div>
+        <Link to="/sos" className="btn btn-primary">Open SOS</Link>
       </div>
-
-      {/* Safety Status Banner */}
-      <div style={{
-        padding: "16px 20px",
-        marginBottom: "24px",
-        borderRadius: "8px",
-        backgroundColor: activeSOS ? "rgba(255, 0, 0, 0.1)" : "rgba(0, 200, 0, 0.1)",
-        border: `2px solid ${activeSOS ? "var(--primary-red)" : "#00c800"}`,
-        textAlign: "center",
-      }}>
-        <p style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: activeSOS ? "var(--primary-red)" : "#00c800" }}>
-          {activeSOS ? "🚨 EMERGENCY ALERT ACTIVE" : "✅ SAFE STATUS"}
-        </p>
-        {!activeSOS && (
-          <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "6px 0 0 0" }}>
-            No active emergency alerts. System is monitoring.
-          </p>
-        )}
+      {error && <div className="alert-banner alert-banner-danger" role="alert">{error}</div>}
+      <div className={`status-strip ${activeSOS ? "is-active" : ""}`}>
+        <span className="status-dot" />
+        <div><strong>{activeSOS ? "SOS alert is active" : "You are in a safe state"}</strong><span>{activeSOS ? "Location sharing and notification attempts are running." : "Your account is ready when you need it."}</span></div>
       </div>
-
-      {error && <div className="alert-banner alert-banner-danger">{error}</div>}
-      {loading ? (
-        <div className="spinner"></div>
-      ) : (
-        <div className="dashboard-grid">
-          <div>
+      <div className="dashboard-grid">
+        <div>
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-title"><h2>{activeSOS ? "Active alert" : "Ready for an emergency"}</h2><span className={activeSOS ? "badge badge-active" : "badge badge-resolved"}>{activeSOS ? "Live" : "Standby"}</span></div>
             {activeSOS ? (
-              <div className="card" style={{ borderLeft: "6px solid var(--primary-red)", marginBottom: "24px" }}>
-                <h3 style={{ color: "var(--primary-red)", display: "flex", alignItems: "center", gap: "10px" }}>
-                  🚨 SOS Alert is ACTIVE
-                </h3>
-                <p style={{ margin: "10px 0" }}>
-                  An emergency alert was triggered on {new Date(activeSOS.triggeredAt || activeSOS.createdAt).toLocaleString()}.
-                </p>
-                <Link to="/sos" className="btn btn-primary btn-sm">
-                  View SOS Details & Resolve
-                </Link>
-              </div>
+              <><p>This alert began {new Date(activeSOS.triggeredAt || activeSOS.createdAt).toLocaleString()}. Open the SOS console to view location updates, contact acknowledgements, and resolve the alert.</p><Link to="/sos" className="btn btn-secondary" style={{ marginTop: 20 }}>View active alert</Link></>
             ) : (
-              <div className="card" style={{ marginBottom: "24px", textAlign: "center", padding: "40px 20px" }}>
-                <h2>Need Immediate Help?</h2>
-                <p style={{ margin: "12px 0 24px 0" }}>
-                  Triggering an SOS starts an email notification attempt. In the college demo, Resend sends only to its configured test recipient.
-                </p>
-                <Link to="/sos" className="btn btn-primary" style={{ padding: "12px 30px" }}>
-                  🚨 Launch SOS Page
-                </Link>
-              </div>
+              <><p>When you hold the SOS control for three seconds, the app creates an alert, starts GPS updates, and attempts notification delivery to your eligible contacts.</p><Link to="/sos" className="btn btn-primary" style={{ marginTop: 20 }}>Go to SOS control</Link></>
             )}
-
-            <div className="card">
-              <h3>System Overview</h3>
-              <p style={{ margin: "10px 0 20px 0" }}>
-                Welcome, <strong>{user?.name}</strong>. Your Silent SOS system is active and monitored.
-              </p>
-              
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div style={{ padding: "16px", backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "24px", fontWeight: "bold", color: "var(--primary-red)" }}>
-                    {contactsCount}
-                  </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                    Emergency Contacts
-                  </div>
-                </div>
-                <div style={{ padding: "16px", backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "24px", fontWeight: "bold", color: "var(--accent-blue)" }}>
-                    {activeSOS ? "Active" : "Ready"}
-                  </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                    Alert Status
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div className="metric-grid"><div className="metric"><div className="metric-value">{contactsCount}</div><div className="metric-label">Trusted contacts</div></div><div className="metric"><div className="metric-value">{activeSOS ? "Live" : "Ready"}</div><div className="metric-label">Alert status</div></div></div>
           </div>
-
-          <div>
-            <div className="card" style={{ marginBottom: "24px" }}>
-              <h3>Quick Actions</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}>
-                <Link to="/contacts" className="btn btn-secondary btn-sm" style={{ justifyContent: "flex-start" }}>
-                  👥 Manage Contacts
-                </Link>
-                <Link to="/profile" className="btn btn-secondary btn-sm" style={{ justifyContent: "flex-start" }}>
-                  ⚙️ Update Profile
-                </Link>
-                <Link to="/history" className="btn btn-secondary btn-sm" style={{ justifyContent: "flex-start" }}>
-                  🕒 View SOS History
-                </Link>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Safety Guidelines</h3>
-              <ul style={{ listStyle: "none", padding: 0, marginTop: "12px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                <li>✔️ Configure emergency contacts with valid email addresses for production-provider testing.</li>
-                <li>✔️ Ensure your phone number is correct under your Profile settings.</li>
-                <li>✔️ Test coordinates and mail receipt when in a safe environment.</li>
-              </ul>
-            </div>
-          </div>
+          <div className="card"><div className="card-title"><h2>Safety checklist</h2></div><ul className="guideline-list"><li>Add at least two contacts with current email addresses.</li><li>Allow location access so an active alert can share coordinates.</li><li>Review alert history after a test in a safe environment.</li></ul></div>
         </div>
-      )}
+        <aside className="card"><div className="card-title"><h2>Quick actions</h2></div><div className="action-list"><Link to="/contacts" className="btn btn-secondary">Manage contacts <span>→</span></Link><Link to="/profile" className="btn btn-secondary">Update profile <span>→</span></Link><Link to="/history" className="btn btn-secondary">Review history <span>→</span></Link></div><div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--border-color)" }}><div className="eyebrow">Privacy note</div><p style={{ fontSize: 13 }}>Location tracking starts only while an SOS is active. This app does not contact emergency services.</p></div></aside>
+      </div>
     </div>
   );
 };

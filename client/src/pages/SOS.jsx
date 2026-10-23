@@ -319,15 +319,14 @@ const SOS = () => {
   }, []);
 
   return (
-    <div style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <h1>Emergency SOS Trigger</h1>
-        <p>Quietly alert your emergency contacts and stream your live safety coordinates.</p>
+    <div className="sos-page">
+      <div className="page-header">
+        <div><div className="eyebrow">Discreet emergency control</div><h1>Emergency SOS</h1><p>Hold the control to alert your trusted contacts and share live coordinates.</p></div>
       </div>
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
       {success && <div className="alert-banner alert-banner-success">{success}</div>}
-      <div className="card sos-trigger-card">
+      <div className={`card sos-trigger-card ${activeSOS ? "active-alert" : ""}`}>
         {activeSOS ? (
           <div style={{ padding: "24px 0" }}>
             <h2 style={{ color: "var(--primary-red)", fontSize: "32px", fontWeight: 700, marginBottom: "12px" }}>
@@ -388,7 +387,7 @@ const SOS = () => {
             ) : null}
 
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-              The notification attempt is running in Resend test mode. Location data is being tracked continuously.
+              Notification attempts run in the background while location data is tracked continuously. A provider acceptance does not guarantee inbox delivery.
             </p>
             {acknowledgements.length > 0 && (
               <p style={{ fontSize: "13px", color: "var(--accent-blue)", marginBottom: "20px" }}>

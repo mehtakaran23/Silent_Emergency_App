@@ -46,46 +46,46 @@ test("sendWithGmail sends one message through the mocked Gmail API", async () =>
     html: "<p>Alert details</p>",
   });
 
-  test("sendGmailMessagesToContacts attempts each eligible recipient independently", async () => {
-    const recipients = [];
-    const gmailClient = {
-      users: {
-        messages: {
-          send: async ({ requestBody }) => {
-            const decoded = Buffer.from(requestBody.raw, "base64url").toString("utf8");
-            recipients.push(decoded.match(/^To: (.+)$/m)[1]);
-            return { data: { id: `mock-${recipients.length}` } };
-          },
-        },
-      },
-    };
-    const mail = (to) => ({
-      from: "sender@example.com",
-      to,
-      subject: "Emergency alert",
-      text: "Alert details",
-      html: "<p>Alert details</p>",
-    });
-
-    const results = await sendGmailMessagesToContacts(gmailClient, [
-      mail("first-contact@example.com"),
-      mail("second-contact@example.com"),
-    ]);
-
-    assert.deepEqual(recipients, [
-      "first-contact@example.com",
-      "second-contact@example.com",
-    ]);
-    assert.deepEqual(results.map((result) => result.messageId), [
-      "mock-1",
-      "mock-2",
-    ]);
-    assert.equal(results.filter((result) => result.error).length, 0);
-  });
-
   assert.equal(messageId, "mock-gmail-message-id");
   assert.equal(calls.length, 1);
   assert.equal(calls[0].userId, "me");
   assert.ok(calls[0].requestBody.raw);
   assert.doesNotMatch(calls[0].requestBody.raw, /refresh|secret|token/i);
+});
+
+test("sendGmailMessagesToContacts attempts each eligible recipient independently", async () => {
+  const recipients = [];
+  const gmailClient = {
+    users: {
+      messages: {
+        send: async ({ requestBody }) => {
+          const decoded = Buffer.from(requestBody.raw, "base64url").toString("utf8");
+          recipients.push(decoded.match(/^To: (.+)$/m)[1]);
+          return { data: { id: `mock-${recipients.length}` } };
+        },
+      },
+    },
+  };
+  const mail = (to) => ({
+    from: "sender@example.com",
+    to,
+    subject: "Emergency alert",
+    text: "Alert details",
+    html: "<p>Alert details</p>",
+  });
+
+  const results = await sendGmailMessagesToContacts(gmailClient, [
+    mail("first-contact@example.com"),
+    mail("second-contact@example.com"),
+  ]);
+
+  assert.deepEqual(recipients, [
+    "first-contact@example.com",
+    "second-contact@example.com",
+  ]);
+  assert.deepEqual(results.map((result) => result.messageId), [
+    "mock-1",
+    "mock-2",
+  ]);
+  assert.equal(results.filter((result) => result.error).length, 0);
 });

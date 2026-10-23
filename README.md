@@ -159,6 +159,6 @@ npm --prefix client run build
 npm --prefix client run lint
 ```
 
-The repository currently has no automated backend test suite. External Resend,
-MongoDB, Vercel, and Render behavior must be verified in their respective
-provider dashboards/logs.
+The backend test suite covers the Gmail message builder and mocked send
+behavior. External Gmail, MongoDB, Vercel, and Render behavior must be
+verified in their respective provider dashboards and logs.

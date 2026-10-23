@@ -17,79 +17,44 @@ const ContactResponse = () => {
         setResponse(result.data);
       } catch (requestError) {
         setError(requestError.response?.data?.message || "This response link is invalid or expired.");
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     };
     loadResponse();
-    const refreshTimer = window.setInterval(loadResponse, 10000);
-    return () => window.clearInterval(refreshTimer);
+    const timer = window.setInterval(loadResponse, 10000);
+    return () => window.clearInterval(timer);
   }, [token]);
 
   const acknowledge = async () => {
-    setSubmitting(true);
-    setError("");
+    setSubmitting(true); setError("");
     try {
       const result = await acknowledgeContactAlert(token);
       setResponse((current) => ({ ...current, ...result.data, acknowledged: true }));
       setMessage("Thank you. The person who triggered this SOS has been notified.");
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Unable to acknowledge this alert.");
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
-  if (loading) {
-    return <div className="auth-container"><div className="card"><div className="spinner" /></div></div>;
-  }
+  if (loading) return <div className="auth-container"><div className="card"><div className="spinner" /></div></div>;
 
-  return (
-    <div className="auth-container" style={{ maxWidth: "560px" }}>
-      <div className="card">
-        <div className="auth-header">
-          <h1>Silent SOS Response</h1>
-          <p>Secure emergency contact response</p>
-        </div>
-        {error && <div className="alert-banner alert-banner-danger">{error}</div>}
-        {message && <div className="alert-banner alert-banner-success">{message}</div>}
-        {response && (
-          <>
-            <p>
-              <strong>{response.user?.name || "A Silent SOS user"}</strong> triggered an SOS alert
-              at {new Date(response.alert?.triggeredAt).toLocaleString()}.
-            </p>
-            <p style={{ marginTop: "12px" }}>
-              Current status: <strong>{response.alert?.status}</strong>
-            </p>
-            {Number.isFinite(response.alert?.currentLocation?.latitude) &&
-              Number.isFinite(response.alert?.currentLocation?.longitude) && (
-                <a
-                  href={`https://www.google.com/maps?q=${response.alert.currentLocation.latitude},${response.alert.currentLocation.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-secondary"
-                  style={{ marginTop: "16px", width: "100%" }}
-                >
-                  View latest location
-                </a>
-              )}
-            <button
-              onClick={acknowledge}
-              className="btn btn-primary"
-              style={{ width: "100%", marginTop: "16px" }}
-              disabled={submitting || response.acknowledged || ["RESOLVED", "CANCELLED"].includes(response.alert?.status)}
-            >
-              {response.acknowledged ? "✓ Alert acknowledged" : submitting ? "Acknowledging..." : "I am responding"}
-            </button>
-            <p style={{ marginTop: "16px", fontSize: "13px", color: "var(--text-secondary)" }}>
-              If there is immediate danger, contact local emergency services.
-            </p>
-          </>
-        )}
-      </div>
+  const location = response?.alert?.currentLocation;
+  const hasLocation = Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude);
+  const closed = ["RESOLVED", "CANCELLED"].includes(response?.alert?.status);
+
+  return <div className="auth-container">
+    <div className="auth-shell"><div className="eyebrow">Secure contact response</div><h1>Someone may need you.</h1><p>Review the alert details below and let them know you are responding.</p></div>
+    <div className="card auth-card">
+      {error && <div className="alert-banner alert-banner-danger" role="alert">{error}</div>}
+      {message && <div className="alert-banner alert-banner-success" role="status">{message}</div>}
+      {response && <>
+        <div className="status-strip is-active"><span className="status-dot" /><div><strong>{response.user?.name || "A Silent SOS user"} triggered an alert</strong><span>{new Date(response.alert?.triggeredAt).toLocaleString()}</span></div></div>
+        <div className="metric-grid"><div className="metric"><div className="metric-value">{response.alert?.status}</div><div className="metric-label">Current status</div></div><div className="metric"><div className="metric-value">{hasLocation ? "Live" : "—"}</div><div className="metric-label">Location signal</div></div></div>
+        {hasLocation && <a href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-block" style={{ marginTop: 18 }}>View latest location</a>}
+        <button onClick={acknowledge} className="btn btn-primary btn-block" style={{ marginTop: 12 }} disabled={submitting || response.acknowledged || closed}>{response.acknowledged ? "Alert acknowledged" : submitting ? "Sending response..." : "I am responding"}</button>
+        <p style={{ marginTop: 18, fontSize: 12, textAlign: "center" }}>If there is immediate danger, contact local emergency services.</p>
+      </>}
     </div>
-  );
+  </div>;
 };
 
 export default ContactResponse;

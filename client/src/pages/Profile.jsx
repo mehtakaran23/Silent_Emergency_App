@@ -1,125 +1,49 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 const Profile = () => {
   const { refreshProfile } = useAuth();
-  
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        setFetchLoading(true);
-        const res = await API.get("/profile/me");
-        if (res.data?.success && res.data?.profile) {
-          const profileData = res.data.profile;
-          setName(profileData.name || "");
-          setEmail(profileData.email || "");
-          setPhone(profileData.phone || "");
-        }
-      } catch (err) {
-        console.error("Failed to load profile:", err);
-        setError("Unable to load profile data.");
-      } finally {
-        setFetchLoading(false);
+    API.get("/profile/me").then((res) => {
+      if (res.data?.success && res.data.profile) {
+        setName(res.data.profile.name || "");
+        setEmail(res.data.profile.email || "");
+        setPhone(res.data.profile.phone || "");
       }
-    };
-    loadProfile();
+    }).catch(() => setError("Unable to load your profile.")).finally(() => setFetchLoading(false));
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!name || (!email && !phone)) {
-      setError("Name and an email or phone number are required.");
-      return;
-    }
-
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError(""); setSuccess("");
+    if (!name || (!email && !phone)) return setError("Name and an email or phone number are required.");
     try {
       setLoading(true);
-      const res = await API.put("/profile/me", { name, email, phone });
-      if (res.data?.success) {
-        setSuccess("Profile updated successfully!");
-        // Update user state in AuthContext
-        await refreshProfile();
-      } else {
-        setError(res.data?.message || "Failed to update profile.");
-      }
-    } catch (err) {
-      console.error("Profile update error:", err);
-      setError(err.response?.data?.message || "Failed to update profile. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      const result = await API.put("/profile/me", { name, email, phone });
+      if (result.data?.success) { await refreshProfile(); setSuccess("Profile saved."); } else setError(result.data?.message || "Unable to save profile.");
+    } catch (requestError) { setError(requestError.response?.data?.message || "Unable to save profile."); } finally { setLoading(false); }
   };
 
-  return (
-    <div style={{ maxWidth: "560px", margin: "40px auto" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <h1>My Profile</h1>
-        <p>Manage your account credentials and primary phone contact information.</p>
-      </div>
-
-      {error && <div className="alert-banner alert-banner-danger">{error}</div>}
-      {success && <div className="alert-banner alert-banner-success">{success}</div>}
-
-      {fetchLoading ? (
-        <div className="spinner"></div>
-      ) : (
-        <div className="card">
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input
-                type="text"
-                className="form-control"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                className="form-control"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Contact Phone Number</label>
-              <input
-                type="tel"
-                className="form-control"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: "10px" }} disabled={loading}>
-              {loading ? "Saving Changes..." : "Save Profile Details"}
-            </button>
-          </form>
-        </div>
-      )}
-    </div>
-  );
+  return <div style={{ maxWidth: 620, margin: "0 auto" }}>
+    <div className="page-header"><div><div className="eyebrow">Account settings</div><h1>Your profile</h1><p>Keep your details current so your account and safety circle stay reliable.</p></div></div>
+    {error && <div className="alert-banner alert-banner-danger" role="alert">{error}</div>}
+    {success && <div className="alert-banner alert-banner-success" role="status">{success}</div>}
+    {fetchLoading ? <div className="spinner" /> : <div className="card"><form onSubmit={handleSubmit}>
+      <div className="form-group"><label className="form-label" htmlFor="profile-name">Full name</label><input id="profile-name" className="form-control" value={name} onChange={(event) => setName(event.target.value)} disabled={loading} required /></div>
+      <div className="form-group"><label className="form-label" htmlFor="profile-email">Email address</label><input id="profile-email" type="email" className="form-control" value={email} onChange={(event) => setEmail(event.target.value)} disabled={loading} /></div>
+      <div className="form-group"><label className="form-label" htmlFor="profile-phone">Phone number</label><input id="profile-phone" type="tel" className="form-control" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={loading} /></div>
+      <button className="btn btn-primary btn-block" disabled={loading}>{loading ? "Saving..." : "Save changes"}</button>
+    </form></div>}
+  </div>;
 };
 
 export default Profile;
