@@ -38,7 +38,7 @@ const Landing = () => {
         <div className="feature-card">
           <div className="feature-icon">✉️</div>
           <h3>Email Alerts</h3>
-          <p>Configured contacts receive structured emergency emails with maps and coordinates.</p>
+          <p>The demo prepares structured emergency emails with maps and coordinates. Resend test mode sends only to its configured test recipient.</p>
         </div>
         <div className="feature-card">
           <div className="feature-icon">👥</div>

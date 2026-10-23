@@ -7,6 +7,11 @@ const jwt = require("jsonwebtoken");
 
 const RESPONSE_TOKEN_TTL = process.env.CONTACT_RESPONSE_TOKEN_TTL || "7d";
 const responseSecret = () => process.env.CONTACT_RESPONSE_SECRET || process.env.JWT_SECRET;
+const getClientBaseUrl = () =>
+  (process.env.CLIENT_URL || process.env.SOCKET_CORS_ORIGIN || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .find(Boolean) || "";
 
 const getResendConfiguration = () => {
   const apiKey = String(process.env.RESEND_API_KEY || "").trim();
@@ -203,7 +208,7 @@ const sendSOSNotificationEmails = async (alert) => {
         console.error("Could not create contact response token:", tokenError);
       }
 
-      const clientBaseUrl = process.env.CLIENT_URL || process.env.SOCKET_CORS_ORIGIN;
+      const clientBaseUrl = getClientBaseUrl();
       const responseUrl = responseToken && clientBaseUrl
         ? `${clientBaseUrl.replace(/\/$/, "")}/respond/${responseToken.token}`
         : null;

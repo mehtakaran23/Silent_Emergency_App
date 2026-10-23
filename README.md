@@ -1,30 +1,145 @@
-"# Silent Emergency App" 
+# Silent Emergency App
 
-## Running locally
+Silent SOS is a React/Vite and Express application for demonstrating
+authenticated emergency alerts, GPS updates, emergency contacts, Socket.IO
+status updates, notification logs, and secure contact-response links.
 
-1. Start MongoDB and set `MONGO_URI` and a strong `JWT_SECRET` in `server/.env`.
-2. Run the API with `cd server && npm run dev`.
-3. Run the client with `cd client && npm run dev`.
+## Architecture
 
-Set `CLIENT_URL` to the client origin. To deliver emergency email notifications,
-also configure `RESEND_API_KEY`, `RESEND_TEST_RECIPIENT`, and `EMAIL_FROM`
-(use `onboarding@resend.dev` while testing). Initial Resend test mode sends
-only to `RESEND_TEST_RECIPIENT`; use a verified sending domain and remove that
-test restriction before sending to emergency contacts in production. Optionally
-set a separate `CONTACT_RESPONSE_SECRET` for response
-links (otherwise `JWT_SECRET` is used). Each successful notification contains a signed, expiring response
-link (`/respond/:token`) that lets the recipient acknowledge the alert without
-creating an account. Acknowledgements and live GPS updates are broadcast to the
-authenticated alert owner over Socket.IO.
+- `client/` — React, Vite, and React Router frontend deployed to Vercel
+- `server/` — Express API and Socket.IO server deployed to Render
+- MongoDB Atlas — Mongoose persistence for users, contacts, alerts, locations,
+  notification logs, and response-link state
+- Resend — HTTPS email API used by the backend
+- JWT — account authentication and signed contact-response links
 
-When Resend is not configured, email attempts are recorded as `FAILED`; the
-application never reports undelivered email as successful.
+The backend creates the SOS alert before starting email delivery in the
+background. A provider failure therefore does not undo the alert or GPS
+workflow.
 
-## API areas
+## Local development
 
-- `/api/auth` — registration, login, and the authenticated current-user endpoint
-- `/api/profile` — read/update the current profile
-- `/api/contacts` — authenticated emergency contact CRUD (maximum five)
-- `/api/sos` — start, resolve/cancel, active/history, and secure contact response
-- `/api/location` — authenticated GPS updates and alert location history
-- `/api/notifications` — delivery/acknowledgement logs for the current user"
+1. Install dependencies:
+
+   ```powershell
+   npm install --prefix server
+   npm install --prefix client
+   ```
+
+2. Copy the environment examples to local `.env` files and fill in local
+   values. Never commit `.env` files.
+3. Start MongoDB or use a development MongoDB Atlas database.
+4. Start the backend:
+
+   ```powershell
+   npm --prefix server run dev
+   ```
+
+5. Start the frontend:
+
+   ```powershell
+   npm --prefix client run dev
+   ```
+
+## Backend environment
+
+See [server/.env.example](./server/.env.example). Required production values
+include:
+
+```env
+MONGO_URI=<MongoDB Atlas connection string>
+JWT_SECRET=<long random secret>
+PORT=<Render-provided port>
+CLIENT_URL=https://silent-emergency-app-six.vercel.app
+SOCKET_CORS_ORIGIN=https://silent-emergency-app-six.vercel.app
+RESEND_API_KEY=<Resend API key>
+EMAIL_FROM=onboarding@resend.dev
+RESEND_TEST_RECIPIENT=<email registered with Resend>
+CONTACT_RESPONSE_SECRET=<long random secret>
+CONTACT_RESPONSE_TOKEN_TTL=7d
+```
+
+`CLIENT_URL` and `SOCKET_CORS_ORIGIN` may contain comma-separated allowed
+origins when multiple Vercel origins are needed. Do not put backend secrets in
+Vite variables.
+
+## Frontend environment
+
+See [client/.env.example](./client/.env.example):
+
+```env
+VITE_API_URL=https://silent-emergency-app.onrender.com/api
+VITE_SOCKET_URL=https://silent-emergency-app.onrender.com
+```
+
+## Resend test-mode limitation
+
+The current zero-cost demo intentionally uses Resend test mode. When
+`RESEND_TEST_RECIPIENT` is configured, the backend sends only to that
+authorized Resend account email and skips other saved contact recipients.
+The UI labels this restriction clearly. A Resend API acceptance ID means the
+provider accepted the request; it does not by itself prove inbox delivery.
+
+To send to real emergency contacts later, configure a verified Resend sending
+domain and remove the test recipient restriction in a deliberate production
+change. Do not bypass Resend's recipient restrictions.
+
+## Demo workflow
+
+1. Open the Vercel frontend and register with an email or phone and a
+   six-character-or-longer password.
+2. Log in and confirm the protected dashboard loads.
+3. Add contacts with a name, relationship, and at least one phone or email
+   method. Contact operations are scoped to the authenticated user.
+4. Open SOS and hold the activation control for three seconds.
+5. Allow browser location access if available. The app records valid GPS
+   updates only while an SOS is active.
+6. Confirm the alert status, current coordinates/map link, notification
+   status, and Resend test-mode notice.
+7. Resolve or cancel the alert and review it in History.
+8. For contact-response testing, use the link from a Resend test email and
+   acknowledge the alert. The signed link expires according to
+   `CONTACT_RESPONSE_TOKEN_TTL`.
+
+This is a college demonstration. It does not contact police, emergency
+services, SMS providers, or a real dispatch center.
+
+## Deployment
+
+### Render
+
+- Root directory: repository root
+- Build command: `cd server && npm install`
+- Start command: `cd server && npm start`
+- Configure the backend variables from `server/.env.example`
+- Deploy the commit containing both `server/package.json` and
+  `server/package-lock.json`
+
+### Vercel
+
+- Root directory: `client`
+- Framework: Vite
+- Build command: `npm run build`
+- Output directory: `dist`
+- Configure `VITE_API_URL` and `VITE_SOCKET_URL`
+- Keep `client/vercel.json` so BrowserRouter routes work on refresh and
+  `/api/:path*` is not swallowed by the SPA fallback
+
+## Validation commands
+
+```powershell
+# Backend syntax
+Get-ChildItem server -Recurse -Filter *.js |
+  Where-Object { $_.FullName -notmatch '\\node_modules\\' } |
+  ForEach-Object { node --check $_.FullName }
+
+# Frontend production build
+npm --prefix client run build
+
+# Frontend lint
+npm --prefix client run lint
+```
+
+The repository currently has no automated backend test suite. External Resend,
+MongoDB, Vercel, and Render behavior must be verified in their respective
+provider dashboards/logs.

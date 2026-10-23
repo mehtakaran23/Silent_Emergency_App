@@ -189,6 +189,12 @@ a:hover {
   border-radius: 6px;
 }
 
+.alert-banner-info {
+  color: var(--accent-blue);
+  background: rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
 /* Cards */
 .card {
   background-color: var(--card-bg);

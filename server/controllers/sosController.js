@@ -290,22 +290,31 @@ const findResponseContext = async (token) => {
 
   const [alert, contact, user] = await Promise.all([
     Alert.findById(decoded.alertId),
-    Contact.findById(decoded.contactId).select("name relation"),
+    Contact.findById(decoded.contactId).select("name relation user"),
     User.findById(decoded.userId).select("name"),
   ]);
 
-  if (!alert || !contact) {
+  if (!alert || !contact || !user) {
     const tokenError = new Error("The alert or contact no longer exists.");
     tokenError.statusCode = 404;
     throw tokenError;
   }
 
-  return { alert, contact, log };
+  if (
+    String(alert.userId) !== String(decoded.userId) ||
+    String(contact.user) !== String(alert.userId)
+  ) {
+    const tokenError = new Error("This response link is not valid for this contact.");
+    tokenError.statusCode = 403;
+    throw tokenError;
+  }
+
+  return { alert, contact, user, log };
 };
 
 const getContactResponse = async (req, res) => {
   try {
-    const { alert, contact, log } = await findResponseContext(req.params.token);
+    const { alert, contact, log, user } = await findResponseContext(req.params.token);
     const acknowledgement = (alert.contactAcknowledgements || []).find(
       (item) => String(item.contactId) === String(contact._id)
     );

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import ResendTestModeNotice from "../components/ResendTestModeNotice";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -63,6 +64,7 @@ const Dashboard = () => {
       </div>
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
+      <ResendTestModeNotice />
 
       {loading ? (
         <div className="spinner"></div>
@@ -85,7 +87,7 @@ const Dashboard = () => {
               <div className="card" style={{ marginBottom: "24px", textAlign: "center", padding: "40px 20px" }}>
                 <h2>Need Immediate Help?</h2>
                 <p style={{ margin: "12px 0 24px 0" }}>
-                  Triggering an SOS sends instant email notifications to all your configured emergency contacts.
+                  Triggering an SOS starts an email notification attempt. In the college demo, Resend sends only to its configured test recipient.
                 </p>
                 <Link to="/sos" className="btn btn-primary" style={{ padding: "12px 30px" }}>
                   🚨 Launch SOS Page
@@ -139,7 +141,7 @@ const Dashboard = () => {
             <div className="card">
               <h3>Safety Guidelines</h3>
               <ul style={{ listStyle: "none", padding: 0, marginTop: "12px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                <li>✔️ Configure at least 3 emergency contacts with valid emails.</li>
+                <li>✔️ Configure emergency contacts with valid email addresses for production-provider testing.</li>
                 <li>✔️ Ensure your phone number is correct under your Profile settings.</li>
                 <li>✔️ Test coordinates and mail receipt when in a safe environment.</li>
               </ul>

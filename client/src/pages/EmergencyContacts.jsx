@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
+import ResendTestModeNotice from "../components/ResendTestModeNotice";
 
 const EmergencyContacts = () => {
   const [contacts, setContacts] = useState([]);
@@ -138,7 +139,7 @@ const EmergencyContacts = () => {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <div>
           <h1>Emergency Contacts</h1>
-          <p>Add up to 5 priority contacts who will receive emergency emails.</p>
+          <p>Add up to 5 priority contacts for the alert workflow.</p>
         </div>
         <button onClick={openAddModal} className="btn btn-primary">
           ➕ Add Contact
@@ -147,6 +148,7 @@ const EmergencyContacts = () => {
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
       {success && <div className="alert-banner alert-banner-success">{success}</div>}
+      <ResendTestModeNotice />
 
       {loading ? (
         <div className="spinner"></div>

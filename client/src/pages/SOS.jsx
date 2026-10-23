@@ -11,6 +11,7 @@ import {
   offSOSResolved,
   offContactAcknowledged,
 } from "../services/socket";
+import ResendTestModeNotice from "../components/ResendTestModeNotice";
 
 const SOS = () => {
   const [activeSOS, setActiveSOS] = useState(null);
@@ -327,6 +328,7 @@ const SOS = () => {
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
       {success && <div className="alert-banner alert-banner-success">{success}</div>}
+      <ResendTestModeNotice />
 
       <div className="card sos-trigger-card">
         {activeSOS ? (
@@ -389,7 +391,7 @@ const SOS = () => {
             ) : null}
 
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-              Emergency contacts are being notified. Location data is being tracked continuously.
+              The notification attempt is running in Resend test mode. Location data is being tracked continuously.
             </p>
             {acknowledgements.length > 0 && (
               <p style={{ fontSize: "13px", color: "var(--accent-blue)", marginBottom: "20px" }}>
